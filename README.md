@@ -1,82 +1,59 @@
-# Foundry setup
+# Setup your VSCode
 
-Welcome to this handy guide on installing and operating Foundry, a versatile tool that will add a new level of command-line ease to your developer journey. Whether you're running Windows, Linux or MacOS, we've got you covered with instructions and tips. So sit back, grab a cup of coffee, and let's dive in.
+## VS Code setup
 
-## Prepping your Terminal
+### Installing VS Code extensions
 
-First things first. Before we dive into installing Foundry, make sure you have your terminal set up correctly.
+1. Open the Extensions view:
 
-If you are using Windows, you should see something like `WSL` or `Ubuntu`. Once you have your terminal environment ready, it’s time for some quick tips to help streamline your workflow.
+There are two ways to do this:
 
-### Keeping your Terminal Clutter-free
+Click the Extensions icon in the Activity Bar on the left side of VS Code.
 
-When commands pile up in your terminal, things can get a little overwhelming. Clear it up by simply typing `clear` and hitting `Enter`. Alternatively, use `Command K` if you're on a Mac or `Control K` if you're on Linux or Windows.
+Use the shortcut Ctrl+Shift+X (Windows/Linux) or Cmd+Shift+X (Mac).
 
-**Pro tip:** This is one of my favorite keyboard shortcuts that I use all the time.
+1. Browse or search for extensions:
 
-### Understanding the Trash Can and the X
+The Extensions view displays featured extensions by default.
 
-The trash can and the X buttons in your terminal perform distinct functions. Hitting `X` simply hides your terminal but retains all the previous lines of code. On the other hand, trashing it essentially deletes whatever is running in it. To open up a clean terminal, hit the trash can and then pull it back using `Toggle` or `Terminal > New Terminal`.
+Use the search bar to find a specific extension by name.
 
-## Installing Foundry
+1. Install the extension:
 
-With our terminal set and some tips up our sleeve, let's progress to installing Foundry. Navigate to the [Foundry website](https://book.getfoundry.sh/getting-started/installation) and from the installation tab, fetch the command to install Foundry.
+Once you've found the extension you want, click the "Install" button.
+VS Code will handle the download and installation process.
 
-The command would look something like this:
+**That's it! The extension should be ready to use within VS Code.**
 
-```bash
-curl -L https://foundry.paradigm.xyz | bash
-```
+### Integrating AI into our work
 
-Hit `Enter` after pasting this in your terminal.
+One of the best extensions that integrates AI in our development is GitHub Copilot
 
-**Note:** You must have Internet access for this to work as it's downloading Foundry from their official website.
+Although it's a premium service, its intuitive AI-powered code autocomplete feature could be a game-changer for you. Of course, you can choose to go with other AI extensions based on your preferences.
 
-## Verifying Your Installation
+You can download GitHub Copilot [here](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot). More details and answers for your GitHub Copilot-related questions are available [here](https://github.com/features/copilot/?editor=vscode#faq).
 
-After running the `curl` command, an output will appear at the bottom of your terminal indicating the detected shell and the fact that Foundry has been added to your `Path`.
+### Other important VS Code Tips
 
-For instance, the output can be something like this:
+**_Beware the white dot_**, if you see it, your work is not saved, which means your project won't behave the way you want it to behave.
 
-```bash
-Detected your preferred shell is bashrc and added Foundry to Path run:source /home/user/.bashrcStart
-a new terminal session to use Foundry
-```
+``CTRL(CMD) + ` ``opens/closes your terminal. It's the equivalent of pressing the `X` button on the top right part of your terminal.
 
-Now, simply type `foundryup` and `Enter` to install and update Foundry to the latest version. Whenever you want to install an update for Foundry, simply run `foundryup` again.
+The `trash can` button, on the left side of the `X` button destroys the terminal, make sure you always remember the difference between these two buttons.
 
-This will install four components: forge, cast, anvil, and chisel. To confirm the successful installation, run `forge --version`. You should get an output indicating the Forge version as shown below.
+Hooray! This concludes the setup part of this course. Now we get to the fun part, actually developing a project using solidity and foundry.
 
-```bash
-Forge version x.x.x
-```
+### More setup ...
 
-Now, here's something to remember: when you hit the trash can in the top right, it literally 'removes' the terminal. The X button, in contrast, simply hides it.
-
-### Is Foundry Up Not Running?
-
-Don't panic if this command doesn't run. You might have an issue with your path, and you might need to add Foundry to your path. In case you run into this issue, check lesson 6 of the GitHub repo associated with this course. If no debugging tips are available there, feel free to start a discussion on the course's GitHub repo. Before doing so, make sure to check if a similar discussion already exists.
-
-Try typing `forge --version` into your terminal. Have you received an unwelcome output saying `Forge command found`? This implies that you have to rerun the `source` command that Foundry offered during installation.
-
-Note: Most of the time the `bashrc` file gets loaded automatically. However, if this doesn't apply to your setup, the following lines can add the required command to the end of your `Bash profile`. This will ensure that your `bashrc` file loads by default.
+Run the following commands in your terminal:
 
 ```bash
-cd ~echo 'source /home/user/.bashrc' >> ~/.bash_profile
+mkdir foundry-f23
+
+cd foundry-f23
 ```
 
-> this depends on your operating system, please check foundry docs to see detailed instructions.
+`mkdir` creates a directory or subdirectory.
+`cd` changes the directory.
 
-## Wrapping Up
-
-And there we have it! Congratulations on installing Foundry and prepping your terminal to work seamlessly with it. Remember, hitting snags during installation is normal, especially if you're new to this. Don't hesitate to engage with the course community via GitHub if you run into issues.
-
-Here's to many hassle-free coding sessions with Foundry!
-
-### Commands after deleting the terminal
-
-```bash
-source /c/Users/zenet/.bashrc
-
-foundryup
-```
+Moving forward, it's advisable to keep all your repositories in this folder. Thus, you'll always have a place to reference all your code.
