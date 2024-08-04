@@ -1,59 +1,24 @@
-# VSCode Solidity setup
+# Compile a smart contract using Foundry
 
-## Improving Code Format in Visual Studio Code
+## Compiling Smart Contracts: A Guide to the Foundry Console Compilation Process
 
-When you first start, your code might just look like a whole bunch of dull, lifeless, white text.
+Open a new terminal. Type in `forge build` or `forge compile` to compile the smart contracts in your project.
 
-This can be easily fixed by using one of the `Solidity` extensions. Out of all the Solidity extensions available in the Extensions tab (CTRL/CMD + SHIFT + X) the following are worth mentioning:
+Once the compiling is finished, you'll see some new folders in the Explorer tab on the left side. One of them is a folder called `out`. Here you'll be able to find the [ABI](https://docs.soliditylang.org/en/latest/abi-spec.html) of the smart contract together with the [Bytecode](https://www.geeksforgeeks.org/introduction-to-bytecode-and-opcode-in-solidity/) and a lot of useful information.
 
-1. [Solidity by Juan Blanco](https://marketplace.visualstudio.com/items?itemName=JuanBlanco.solidity), the most used Solidity extension out there.
-2. [Solidity by Nomic Foundation](https://marketplace.visualstudio.com/items?itemName=NomicFoundation.hardhat-solidity) is Patrick's favorite Solidity extension. The rest of the course will be displaying this extension.
-3. [Solidity Visual Developer](https://marketplace.visualstudio.com/items?itemName=tintinweb.solidity-visual-auditor) is another popular choice.
+The `cache` folder also appears. Generally, this folder is used to store temporary system files facilitating the compilation process. But for this course, you can safely ignore it.
 
-**NOTE**: If the code remains unhighlighted despite having installed the extension, there's a quick solution to that. Press `Command + Shift + P`, or `Control + Shift + P` on Windows. This opens up the command bar. In the command bar, type in "Settings" and select "Preferences: Open User Settings (JSON)".
+### More terminal wizardry
 
-If you have nothing in there, create a new setting by typing in:
-
-```json
-{
-  "editor.defaultFormatter": "NomicFoundation.hardhat"
-}
-```
-
-Use:
-
-`"editor.defaultFormatter": "tintinweb.solidity-visual-auditor"` for Solidity Visual Developer
-
-or
-
-`"editor.defaultFormatter": "JuanBlanco.solidity"` for Solidity by Juan Blanco
-
-### Other interesting extensions
-
-In the previous lesson, we mentioned a file called `foundry.toml`. This also has an extension that formats it to make it easier to read. Please install [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml).
-
-Another indispensable extension is [Inline Bookmarks](https://marketplace.visualstudio.com/items?itemName=tintinweb.vscode-inline-bookmarks).
-
-The Inline Bookmarks plugin facilitates bookmarking the actual code. The extension can be used for document review, auditing, log analysis, and keeping track of development notes and to-do lists. You may share your notes and bookmarks with others with ease because they are saved with your files.
-
-The following default trigger words/tags are configured by default:
+Throughout your solidity development/audit journey you will type a lot of terminal commands, every time to make a change that you want tested you'll probably have to rerun the `forge build` then maybe you test it with `forge test` or run a script with `forge script` and many more. Typing all these over and over again is inefficient and time-consuming. The better way is to use the `up` and `down` arrow keys. Type the following commands:
 
 ```bash
-@todo - (blue) General ToDo remark.
-@note - (blue) General remark.
-@remind - (blue) General remark.
-@follow-up - (blue) General remark.
-@audit - (red) General bookmark for potential issues.
-@audit-info - (blue) General bookmark for information to be noted for later use.
-@audit-ok - (green) Add a note that a specific line is not an issue even though it might look like.
+echo "I like Foundry"
+echo "I love Cyfrin"
 
-@audit-issue - (purple) Reference a code location an issue was filed for.
+echo "Auditing is great"
 ```
 
-You can fully customize the colors!
+Now press the `up` and `down` arrow keys to cycle through the 3 commands.
 
-Remember these! They will be very handy in developing and especially in auditing projects.
-
-More details are available [here](https://github.com/tintinweb/vscode-inline-bookmarks).
-
-Next comes the fun part! Let's compile our contract using Foundry!
+Ok, cool! We learned how to compile a contract, but how does one deploy a smart contract?
