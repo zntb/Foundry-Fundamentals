@@ -1,52 +1,48 @@
-# What is a transaction
+# Important - private key safety pt.2
 
-## More about blockchain transactions
+## How to not have your private key in the command line
 
-In the previous lesson we kept talking about transactions, but we never explained what a transaction is. In simple terms, a transaction captures details of an activity that has taken place on a blockchain.
-
-On the left side of your screen, in the Explorer tab, you'll find a folder called `broadcast`. Foundry saves all your blockchain interactions here. The `dry-run` folder is used for interactions you made when you didn't have a blockchain running (remember that time when we deployed our contract without specifying an `--rpc-url`). Moreover, the recordings here are separated by `chainId`.
-
-**Note**: The `chainId` is a unique identifier assigned to a specific blockchain network. It is used to distinguish one blockchain from another and is a crucial parameter for ensuring the security and integrity of transactions and interactions on the blockchain.
-
-Click on `run-latest.json`.
-Here we can find more details about the last deployment script we ran in our previous lesson. It will show things like `transactionType`, `contractName` and `contractAddress`. Moreover, in the `transaction` section, you can see what we actually sent over to the RPC URL:
+Some lessons ago we deployed `SimpleStorage` using the following command:
 
 ```bash
-      "transaction": {
-        "from": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
-        "to": null,
-        "gas": "0x714e1",
-        "value": "0x0",
-        "input": "0x608060...c63430008130033",
-        "nonce": "0x0",
-        "chainId": "0x7a69",
-        "accessList": null,
-        "type": null
-      }
+forge script script/DeploySimpleStorage.s.sol --rpc-url http://127.0.0.1:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 ```
 
-Let's go through each of these:
+Having our private key in plain text is very bad, as we've explained in [Lesson 13](https://updraft.cyfrin.io/courses/foundry/foundry-simple-storage/private-key-safety). What can we do to avoid this, except using the `--interactive` parameter, because we don't want to keep copy-pasting our private key?
 
-- `from` is self-explanatory, it's the address we used to sign the transaction;
+**BIG BOLDED DISCLAIMER: What we are about to do is fine for development purposes, do not put a real key here, it very terrible for production purposes.**
 
-- `to` is the recipient, in our case is null or address(0), this is the standard destination for when new smart contracts are deployed;
+Create a new file in the root of your project called `.env`. Then go the the `.gitignore` file and make sure `.env` is in there.
 
-- `gas` is the amount of gas spent. You will see the hex value 0x714e1 (or any other value represented in hex format);
+The `.env` file will host environment variables. Variables that are of a sensitive nature that we don't want to expose in public.
 
-Quick tip: Normal humans can't understand hex values like the one indicated above, but there's a quick way to convert these into usual numbers. Run the following command in your terminal: cast --to-base 0x714e1 dec. cast is a very versatile tool provided by Foundry, type cast --help in your terminal to find out more, or go here.
+Open the file and put the following in it:
 
-- `value` is the transaction value, or the amount of ETH we are sending over. Given that this transaction was made to deploy a contract, the value here is 0x0 or 0, but we could have specified a value and that would have been the initial balance of the newly deployed contract;
+```bash
+PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
-- `data` in this case is the contract deployment code and the contract code. In the excerpt above this was truncated;
+RPC_URL=http://127.0.0.1:8545
+```
 
-- `nonce` is a unique identifier assigned to each transaction sent from a specific account. The nonce is used to ensure that each transaction is processed only once and to prevent replay attacks. nonce is incremented with every single transaction;
+Next run `source .env`. This adds the above-mentioned environment variables into our shell. Now run `echo $PRIVATE_KEY` or `echo $RPC_URL` to check if the values are stored in the shell.
 
-- `accessList` is a feature of Ethereum to optimize the gas cost of transactions. It contains a list of addresses and associated storage keys that the transaction is likely to access, allowing the EVM to more efficiently compute the gas cost of storage access during the transaction's execution;
+Now we can safely replace the parameters in our `forge script` command:
 
-- `type` please ignore this for now.
+```bash
+forge script script/DeploySimpleStorage.s.sol --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY
+```
 
-There are other values that play an important part that weren't presented in that list, namely the v, r, and s. These are components of a transaction's signature, which are used to validate the authenticity and integrity of the transaction.
+This doesn't only hide your private key from plain sight in the command line but also facilitates faster terminal usage, imagine you'd have to copy-paste the `http://127.0.0.1:8545` RPC URL over and over again. It's cleaner this way.
 
-Whenever we send a transaction over the blockchain there's a signature happening, that's where we use our private key.
+But yes, now we have the private key in plain text in the `.env` file, that's not good.
 
-Important: Every time you change the state of the blockchain you do it using a transaction. The thing that indicates the change is the data field of a transaction. Deployment bytecode, contract bytecode and OPCODEs will be tackled in a future lesson.
+### How to handle this problem with production code?
+
+Foundry has a very nice option called `keystore`. To read more about it type `forge script --help` in your terminal. Using `forge script --keystore <PATH>` allows you to specify a path to an encrypted store file, encrypted by a password. Thus your private key would never be available in plain text.
+
+Let's agree to the following:
+
+1. For testing purposes use a `$PRIVATE_KEY` in an `.env` file as long as you don't expose that `.env` file anywhere.
+2. Where real money is involved use the `--interactive` option or a [keystore file protected by a password](https://github.com/Cyfrin/foundry-full-course-f23?tab=readme-ov-file#can-you-encrypt-a-private-key---a-keystore-in-foundry-yet).
+
+There's one more thing about storing keys in a `.env` file. Please take a look at the ["THE .ENV PLEDGE"](https://github.com/Cyfrin/foundry-full-course-f23/discussions/5). Read it, understand it and comment `I WILL BE SAFE`. Tweet it, Tiktok it, blog about it, make an Insta story about it, print it and put it on your fridge and share some copies with your neighbors. Please stay safe!
