@@ -1,63 +1,46 @@
-# Interact with a smart contract using the CLI
+# Deploying our Contract to Testnet or Live Network with Foundry and Alchemy
 
-## Interacting With Contract Addresses via Command Line & Foundry's Cast Tool
+Hi, everyone! Are you curious about what your contract would look like on a testnet or a live network? If so, buckle up because this blog post will cover exactly that! We'll walk through the process of updating our Environment Variable (.env) file for an actual testnet.
 
-This lesson builds on top of previous lessons where we deployed `SimpleStorage` via `forge script`. We have `Anvil` running and the smart contract is deployed.
+Clearly, we need an actual testnet for a real network. But our trusty Metamask has built-in Infura connections that are incompatible. Why? Because they're tailored specifically for MetaMask. Hence, we need our own Remote Procedure Call (RPC) URL.
 
-Copy the contract address.
+## Creating our Own RPC URL for a Testnet
 
-### Sending information to the blockchain
+_To create one, we could run our own blockchain node, but let's be honest — many folks prefer avoiding that route. Instead, we utilize Node as a Service (NaaS) applications to expedite the process._
 
-Foundry has an in-built tool known as `Cast`. `Cast` comes loaded with numerous commands to interact with. Learn more about them by typing `cast --help`. One such useful command is `send` which is designed to sign and publish a transaction. To view help about `send`, type `cast send --help`.
+One promising option is using Alchemy - a free NaaS platform that we can send the transactions to. This procedure resides within the _Deploying to Testnet or Mainnnet_ section in the full course repo of the Foundry.
 
-To use `send` we need a signature and some arguments.
+<img src="/foundry/19-testnet-deploy/testnet1.png" style="width: 100%; height: auto;">
 
-Please call the following in your terminal:
+To access the Alchemy platform, we simply click on the aforementioned function. On the platform, we sign up (I used Google sign-in for this demo).
 
-**Note**: Down below use the address you copy-pasted from your terminal, there's a chance it will be different than the one mine was deployed.
+Our next step is creating a new app in the Alchemy user interface. I named mine _Sepolia Testing_ and kept the description the same, given that our chain will be an Ethereum one based on Ethiopia.
 
-```bash
-cast send 0x5FbDB2315678afecb367f032d93F642f64180aa3 "store(uint256)" 1337 --rpc-url $RPC_URL --private-key $PRIVATE_KEY
-```
+We can bypass advanced features for now and finalize our app. Now we have the app details needed for our node, including frequency of calls and other details. We also have a new https endpoint by clicking view key, which functions exactly the same way as our ganache or MetaMask endpoint.
 
-**What did we just do?**
+## Altering our Private Key
 
-Let's break it down:
+Next, let's do something about our private keys. Our ganache private key will no longer cut it — it has neither real money nor any testnet ETH in it.
 
-- `cast send` is the command we used to sign and publish our transaction;
-- `0x5FbDB2315678afecb367f032d93F642f64180aa3` or any other address is the target of our `cast send`, the contract we are interacting with;
-- `"store(uint256)"` is the [signature of the function](https://ethereum.stackexchange.com/questions/135205/what-is-a-function-signature-and-function-selector-in-solidity-and-evm-language) we are calling.
-- `1337` is the number we pass to the `store` function. As we can see in the function signature, we are expected to provide an `uint256` input. You can obviously provide any number you want, as long as it fits `uint256`.
-- you already know what `--rpc-url $RPC_URL --private-key $PRIVATE_KEY` are. The place where we send and the private key we use to sign.
+Our solution is to use one of our MetaMask private keys. To do this, we switch back to Sepolia in our MetaMask, choose an account with money in it, click on account details, and export the private key. _Remember, never share your real private key!_
 
-### Reading information from the blockchain
+Upon confirmation with your password, copy the private key and omit the line in the env file — hashtag or pound sign denoting comments.
 
-`Cast` conveniently provides a way to read information stored on the blockchain. Type `cast call --help` in your terminal to find out more. It works similarly to `send`, where you have to provide a signature and some arguments. The difference is you are only peering into the storage, not modifying it.
+## Executing the Transaction
 
-Call the following command in your terminal:
+With our Sepolia RPC URL and private key from MetaMask, executing a transaction now becomes tremendously easier.
 
 ```bash
-cast call 0x5FbDB2315678afecb367f032d93F642f64180aa3 "retrieve()" --rpc-url $RPC_URL
+source .env
+forge script script deploySimpleStorage.s.sol --rpc_url=$Sepolia_RPC_URL --private-key=$private_key --broadcast
 ```
 
-We receive back the following:
+This command deploys our contract to the testnet, and we can monitor the transaction on our Alchemy dashboard.
 
-```bash
-0x0000000000000000000000000000000000000000000000000000000000000539
-```
+We soon find that our contract, Simple Storage, has been deployed on the Sepolia chain. We can grab our transaction hash and input it into Sepolia etherscan IO to confirm the successful transaction.
 
-This represents a hex value. In the previous lessons, we learned how to convert this to a normal number.
+After we refresh our Alchemy dashboard, we'll verify the requests sent and track the ETH send raw transaction that transmitted our transaction to the blockchain.
 
-Type the following command in your terminal:
+So, this is how we deploy our contract on a real testnet leveraging Foundry and Alchemy!
 
-```bash
-cast --to-base 0x0000000000000000000000000000000000000000000000000000000000000539 dec
-```
-
-And surprise, surprise, `1337` came back.
-
-I recommend you play around and send multiple transactions with different numbers and then read them from the blockchain.
-
-Awesome! We've learned something very valuable. You are going to use this more times than you can count.
-
-**Up next:** Deploying a smart contract on Sepolia
+Our next step will explore adding real-world components to the mix. Stay tuned!
