@@ -1,48 +1,41 @@
-# Important - private key safety pt.2
+# Never Use A Env File
 
-## How to not have your private key in the command line
+## Meanwhile, some things have changed
 
-Some lessons ago we deployed `SimpleStorage` using the following command:
+In our previous lesson, we showed you how to configure and use a `.env` file to hold your private key and rpc url, some developments have taken place since that lesson was made so ... You should never use a `.env` again.
 
-```bash
-forge script script/DeploySimpleStorage.s.sol --rpc-url http://127.0.0.1:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-```
+### Encrypting your Keys Using ERC2335
 
-Having our private key in plain text is very bad, as we've explained in [Lesson 13](https://updraft.cyfrin.io/courses/foundry/foundry-simple-storage/private-key-safety). What can we do to avoid this, except using the `--interactive` parameter, because we don't want to keep copy-pasting our private key?
+For now, let's pretend our private key is this:
 
-**BIG BOLDED DISCLAIMER: What we are about to do is fine for development purposes, do not put a real key here, it very terrible for production purposes.**
+`0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` (key 0 from Anvil)
 
-Create a new file in the root of your project called `.env`. Then go the the `.gitignore` file and make sure `.env` is in there.
-
-The `.env` file will host environment variables. Variables that are of a sensitive nature that we don't want to expose in public.
-
-Open the file and put the following in it:
+Type the following command in your terminal:
 
 ```bash
-PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-
-RPC_URL=http://127.0.0.1:8545
+cast wallet import nameOfAccountGoesHere --interactive
 ```
 
-Next run `source .env`. This adds the above-mentioned environment variables into our shell. Now run `echo $PRIVATE_KEY` or `echo $RPC_URL` to check if the values are stored in the shell.
+Ideally, you don't do this in your VS Code.
 
-Now we can safely replace the parameters in our `forge script` command:
+You will be asked for your private key and a password to secure it. You will do this only once, which is amazing!
+
+If you remember, last lesson we deployed running the following command:
 
 ```bash
 forge script script/DeploySimpleStorage.s.sol --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY
 ```
 
-This doesn't only hide your private key from plain sight in the command line but also facilitates faster terminal usage, imagine you'd have to copy-paste the `http://127.0.0.1:8545` RPC URL over and over again. It's cleaner this way.
+Now that we configured our wallet we can deploy as following:
 
-But yes, now we have the private key in plain text in the `.env` file, that's not good.
+```bash
+forge script script/DeploySimpleStorage.s.sol --rpc-url http://127.0.0.1:8545 --broadcast --account nameOfAccountGoesHere --sender 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+```
 
-### How to handle this problem with production code?
+You will be asked for your password. You won't be able to deploy without your password.
 
-Foundry has a very nice option called `keystore`. To read more about it type `forge script --help` in your terminal. Using `forge script --keystore <PATH>` allows you to specify a path to an encrypted store file, encrypted by a password. Thus your private key would never be available in plain text.
+To see all the configured wallets you can call the following: `cast wallet list`.
 
-Let's agree to the following:
+Clear your history so your private key won't randomly remain there using the following command: `history -c`.
 
-1. For testing purposes use a `$PRIVATE_KEY` in an `.env` file as long as you don't expose that `.env` file anywhere.
-2. Where real money is involved use the `--interactive` option or a [keystore file protected by a password](https://github.com/Cyfrin/foundry-full-course-f23?tab=readme-ov-file#can-you-encrypt-a-private-key---a-keystore-in-foundry-yet).
-
-There's one more thing about storing keys in a `.env` file. Please take a look at the ["THE .ENV PLEDGE"](https://github.com/Cyfrin/foundry-full-course-f23/discussions/5). Read it, understand it and comment `I WILL BE SAFE`. Tweet it, Tiktok it, blog about it, make an Insta story about it, print it and put it on your fridge and share some copies with your neighbors. Please stay safe!
+**_Stay safe! Stay froggy! Don't lose your keys. If you are seeing your private key in plain text, you are doing something wrong._**
