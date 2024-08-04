@@ -1,25 +1,59 @@
-# Foundry Setup Wsl
+# VSCode Solidity setup
 
-## Introduction
+## Improving Code Format in Visual Studio Code
 
-Hallo 👋🏻, I'm Vasily and I'll be your instructor for all Windows development. You'll see me frequently as I guide you through installing, running, and configuring various Windows tools.
+When you first start, your code might just look like a whole bunch of dull, lifeless, white text.
 
-### WSL setup
+This can be easily fixed by using one of the `Solidity` extensions. Out of all the Solidity extensions available in the Extensions tab (CTRL/CMD + SHIFT + X) the following are worth mentioning:
 
-Microsoft has singificantly inproved its development environment support in recent years. However, for _smart contract development_, installing dependencies can sometimes be tricky. To streamline this process, we will use the **Windows Subsystem for Linux (WSL)**: this is a better option because it enables a full-fledged _unix-like console_ on your Windows machine, simplifying the use of tools and utilities commonly found in unix-based environments. This setup ensures compatibility with all the code that runs on unix-based systems like macOS and Linux.
+1. [Solidity by Juan Blanco](https://marketplace.visualstudio.com/items?itemName=JuanBlanco.solidity), the most used Solidity extension out there.
+2. [Solidity by Nomic Foundation](https://marketplace.visualstudio.com/items?itemName=NomicFoundation.hardhat-solidity) is Patrick's favorite Solidity extension. The rest of the course will be displaying this extension.
+3. [Solidity Visual Developer](https://marketplace.visualstudio.com/items?itemName=tintinweb.solidity-visual-auditor) is another popular choice.
 
-To install WSL, you can begin by opening the Windows terminal. On Windows 11, press the Windows key, type "terminal," and hit `enter`. On Windows 10, you need to install the Windows terminal from the Microsoft Store (select the official app from Microsoft Corporation).
+**NOTE**: If the code remains unhighlighted despite having installed the extension, there's a quick solution to that. Press `Command + Shift + P`, or `Control + Shift + P` on Windows. This opens up the command bar. In the command bar, type in "Settings" and select "Preferences: Open User Settings (JSON)".
 
-Once installed, open the terminal and type `wsl --install`. This command will initiate the installation process. Afterward, restart your computer. Upon reboot, the terminal will appear again, prompting you to select a Unix username and set a password. WSL will be then successfully installed ✅.
+If you have nothing in there, create a new setting by typing in:
 
-### Visual Studio Code
+```json
+{
+  "editor.defaultFormatter": "NomicFoundation.hardhat"
+}
+```
 
-After installing WSL, we need to install a code editor. We will use Visual Studio Code (VS Code), and there are three different methods to install it:
+Use:
 
-1. **Using the Terminal**: Utilize `winget`, a package manager pre-installed on Windows 11. Open the terminal and type `winget search VS Code` to find the desired package. Then, execute `winget install Microsoft.VisualStudioCode` to install VS Code.
+`"editor.defaultFormatter": "tintinweb.solidity-visual-auditor"` for Solidity Visual Developer
 
-2. **Via Web Browser**: Search for "Visual Studio Code" in your web browser, select the official Microsoft link and download the installer. Follow the prompts, accept the user agreement and customize all the installation options.
+or
 
-3. **Using VSCodium**: For those who prefer more independence and privacy, there is an open-source alternative called **VSCodium**. It is similar to VS Code but without Microsoft's telemetry. Download the [VSCodium installer](https://github.com/VSCodium/vscodium/releases) from GitHub and follow its similar installation steps.
+`"editor.defaultFormatter": "JuanBlanco.solidity"` for Solidity by Juan Blanco
 
-Choose the method that best suits your needs. For this course, I will use the official Visual Studio Code from Microsoft.
+### Other interesting extensions
+
+In the previous lesson, we mentioned a file called `foundry.toml`. This also has an extension that formats it to make it easier to read. Please install [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml).
+
+Another indispensable extension is [Inline Bookmarks](https://marketplace.visualstudio.com/items?itemName=tintinweb.vscode-inline-bookmarks).
+
+The Inline Bookmarks plugin facilitates bookmarking the actual code. The extension can be used for document review, auditing, log analysis, and keeping track of development notes and to-do lists. You may share your notes and bookmarks with others with ease because they are saved with your files.
+
+The following default trigger words/tags are configured by default:
+
+```bash
+@todo - (blue) General ToDo remark.
+@note - (blue) General remark.
+@remind - (blue) General remark.
+@follow-up - (blue) General remark.
+@audit - (red) General bookmark for potential issues.
+@audit-info - (blue) General bookmark for information to be noted for later use.
+@audit-ok - (green) Add a note that a specific line is not an issue even though it might look like.
+
+@audit-issue - (purple) Reference a code location an issue was filed for.
+```
+
+You can fully customize the colors!
+
+Remember these! They will be very handy in developing and especially in auditing projects.
+
+More details are available [here](https://github.com/tintinweb/vscode-inline-bookmarks).
+
+Next comes the fun part! Let's compile our contract using Foundry!
