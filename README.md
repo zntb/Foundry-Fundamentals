@@ -1,22 +1,30 @@
-# Zksync Local Deploy
+# Tx Types
 
-In this lesson, we are going to deploy the contract `SimpleStorage.sol` on a **zkSync local chain**.
+## Introduction
 
-We start by verifying that the Forge version we are using is correct. By running the `forge --version` command it confirms that we are on version 0.2: this indicates we are using the right Foundry zkSync edition.
+In this lesson, we will explore the different transaction types within the ZK Sync VM and EVM ecosystems.
 
-Next, we proceed with creating a `SimpleStorage` contract using the command:
+### `/broadcast` Folder
 
-```bash
-forge create src/SimpleStorage.sol:SimpleStorage --rpc_url <RPC_URL> --private_key <PRIVATE_KEY> --legacy --zksync
-```
+When deploying to a zkSync local node, a `/broadcast` folder will be created and it will contain detailed information about the **deployment transactions**. Inside this folder, you will find subfolders named after specific deployment chain IDs, such as **`260`** for ZK Sync and **`31337`** for Anvil. These subfolders store the data of the transactions executed during the deployment process.
 
-Here, `<RPC_URL>` represents zkSync node address, such as `http://127.0.0.1:8011`.
+By examining both the `run-latest.json` file in these folders, we can observe different **transaction types** for each transaction within a chain. For instance, transactions on the Anvil chain might be labeled as type **`0x2`**, while those on the zkSync chain will be of type \*\* `0x0`\*\*. Deploying a smart contract on the EVM without the `--legacy` flag results in a default transaction type of `0x2`. Adding the `--legacy` flag changes it to type `0x0`.
+
+The EVM and ZK Sync ecosystems support multiple transaction types to accommodate various Ethereum Improvement Proposals (EIPs). Initially, Ethereum had only one transaction type (`0x0` legacy), but as the ecosystem evolved, multiple types were introduced through various EIPs. Subsequent types include type 1, which introduces an _access list_ of addresses and keys, and type 2, also known as [EIP 1559](https://eips.ethereum.org/EIPS/eip-1559) transactions.
 
 > 👀❗**IMPORTANT**
-> Including private keys directly in commands is not a safe practice.
+> This `0x2` type is the current default type for the EVM.
 
-This command instructs Foundry to locate the `SimpleStorage` contract in the `src/SimpleStorage.sol` file and deploy it. Upon execution, the contract compiles and deploys successfully. The output will display details such as the deployer, the deployed contract address, and the transaction hash.
+Additionally, ZK Sync introduces its [unique transaction type](https://docs.zksync.io/zk-stack/concepts/transaction-lifecycle#eip-712-0x71), the type `113` (`0x71` in hex), which can enable features like [account abstraction](https://docs.zksync.io/build/developer-reference/account-abstraction/).
 
-Using the `--legacy` flag is recommended for deploying simple contracts, while more complex codebases may require different approaches. Attempting to deploy without the `--legacy` flag might result in errors like `failed to serialize transaction, address to address is null`, which will be covered in future lessons.
+> 💡 **TIP**
+> The `forge script` command will work in some scenarios, but it’s not entirely clear where it might fail. For the purpose of this course, we will assume scripting does not work while working with Sync.
 
-Once you are finished, you can close Docker Desktop and revert to the Vanilla Foundry environment using the `foundryup` command.
+### Resources
+
+- [zkSync documentation](https://docs.zksync.io/zk-stack/concepts/transaction-lifecycle#transaction-types) about transaction types
+- [Cyfrin Blog on EIP-4844](https://www.cyfrin.io/blog/what-is-eip-4844-proto-danksharding-and-blob-transactions)
+
+### Conclusion
+
+The ZK Sync VM and EVM ecosystems support various transaction types to meet different EIP requirements. By examining deployment folders and understanding the use of flags like `--legacy`, we can effectively distinguish between these transaction types.
