@@ -1,72 +1,35 @@
-# Introduction to Alchemy
+# Section 1 summary
 
-## Alchemy: A Game Changer for Decentralized Application Development
+## Celebrating Milestones in Foundry: A Complete Walkthrough of Our Recent Project
 
-Innovation in the blockchain industry has come a long way, with powerful tools making their way into the ecosystem to support developers and bring efficiency to their workflows. Among these tools is Alchemy, and today we have Vito, the lead developer experience at Alchemy, to walk us through the platform, its features, and how you can leverage it to exponentially increase your productivity.
+You should feel a warm sense of accomplishment envelop you. Completing an entire project in Foundry is no mean feat. A hearty congratulation is in order for such an indomitable effort. This article serves as a quick, yet comprehensive, recap of everything we learnt in our project, proceeding into our next engagement. From the onset, rest assured, we are set to advance our Foundry skills, push upcoming projects on GitHub, and familiarize ourselves with advanced tooling.
 
-## What is Alchemy?
+## A Quick Trip Down Memory Lane: Key Takeaways from the Project
 
-Alchemy is a platform equipped with APIs, SDKs, and libraries to enhance your developer experience while working on Web3 projects. Think of Alchemy as the AWS of Web3. It functions as a node provider and developer tooling platform predominantly used in thousands of Web3 and Web2 applications, including large Web2 corporations like Adobe, Shopify, and Stripe.
+Firstly, we journeyed through the process of creating a new Foundry project using Forge and Knit. These essential tools afforded us a structured, professional environment complete with folders to keep our work organized.
 
-The need for platforms such as Alchemy arises from the fact that, as a developer, you don't usually have to worry about running the servers your code operates on or developing the deployment and integration pipelines for your application. Instead, you use services such as AWS, Azure, and Google Cloud for that—Alchemy does the same but for Web3.
+We not only learnt about Foundry’s basic commands but also their specific functionalities such as:
 
-## How Does Alchemy Work?
+- **Cast**: interacts with contracts that have been previously deployed.
+- **Forge**: compiles and interacts with our contracts.
+- **Anvil**: deploys a local blockchain, similar to another tool we used, Ganache.
 
-Alchemy enhances your developer experience through a combination of features. The platform's primary component is the _Supernode_, a proprietary blockchain engine that works as a load balancer on top of your node.
+A pivotal part of our learning process was comprehending that sending a transaction via our MetaMask is tantamount to making an HTTP post request to a particular RPC URL. A similar RPC URL can be obtained from a node-as-a-service provider like [Alchemy](https://www.alchemyapi.io/) and used to send transactions directly from our Foundry projects.
 
-Like its name suggests, the Supernode ensures data from the blockchain is always up-to-date and readily available. Using the Supernode as a foundation, Alchemy has built the _Enhanced APIs_—a set of APIs that makes pulling data from the blockchain a breeze.
+We obtained practical knowledge on how to compile code in Foundry and write a Solidity script for its subsequent deployment. We also find it critical to ensure the security of our private keys. Hence, throughout this course, we will be using an `.env` file. But be warned when dealing with real money, having your private key in plain text is not advisable.
 
-To put it simply, the Alchemy Supernode sits at the core of its ecosystem, powering up functionalities like Enhanced APIs and monitoring tools while supporting multiple chains.
+## Understanding Contract Deployment and Interaction on the Blockchain
 
-What follows is a step-by-step guide on how to create a new account on Alchemy and leverage this platform to its full extent:
+We delved into the automation of contract deployments to a blockchain. Post-deployment, we interacted with them using the `Cast` keyword and `send` to make transactions, then `Cast call` to read from those contracts.
 
-## Creating a New Account on Alchemy
+Moreover, the knowledge on how to auto format contracts with `Forge format` was acquired. We also learnt the painstaking yet rewarding manual method of verifying our contracts on the blockchain.
 
-Creating an account on Alchemy is not only easy but also completely free. You can also freely scale your applications up using the platform's generous premium plans.
+```bash
+forge format my_contract.sol
+```
 
-### Step 1: Navigate to Alchemy.com
+## Looking Ahead
 
-Head over to [Alchemy.com](https://www.alchemy.com/) and create a new account.
+With these tools in your web development arsenal, you've performed exceptionally well – and yes, you should be incredibly proud. Remember, even something as small as installing tools like `Vs code` and `Foundry` can pose great difficulties, so, you're doing fantastic.
 
-#### Step 2: Create a New Application
-
-Once you have signed in, create a new application.
-
-Next, give your application a name and a description. Then, select a chain and network. Alchemy currently supports the majority of EVM-compatible chains, including:
-
-- Ethereum
-- Polygon (POS)
-- Zkevm
-- Optimism
-- Astar
-- Solana (non-EVM chain)
-
-## The Application-Specific Dashboard
-
-Once your application is up and running, you will have access to the application-specific dashboard. This dashboard provides crucial insights into your application and infrastructure health, such as latency, compute units, and transaction success rate, which can be valuable for debugging and identifying issues.
-
-If you observe a lower success rate for your transactions, go to the "Recent Invalid Request" tab. This will list all unsuccessful requests along with the reasons for their failure, making it easier for you to debug and fix issues.
-
-## Mempool Watcher
-
-Another powerful tool provided by Alchemy is the Mempool watcher. Picture it as Ethereum's mempool, where all pending transactions reside waiting for validation or mining.
-
-The Mempool watcher provides extensive details about your transactions, such as:
-
-- Transaction status (mined, pending, dropped, replaced)
-- Gas used
-- Time taken for validation
-- Transaction value
-- Sender's and receiver's address
-
-This detailed transaction tracking allows you to have a better understanding of each transaction and aids immensely in debugging specific issues related to individual transactions.
-
-## Wrapping Up
-
-To sum up, Alchemy is a revolutionary platform that brings a plethora of tools to aid your Web3 development experience. From Supernode to Enhanced APIs and crucial troubleshooting tools, Alchemy is undeniably a game changer in the world of decentralized applications.
-
-"Alchemy can be a powerful asset to any blockchain developer, offering a simplified experience in an inherently complicated Web3 environment." – Vito, Lead Developer Experience at Alchemy.
-
-Vito suggests that you check out Alchemy's [documentation](https://docs.alchemy.com/) to explore more about the platform, its APIs, SDKs, libraries, and tools. Also, don't forget to follow them on Twitter at [@AlchemyPlatform](https://twitter.com/alchemyplatform) and [@AlchemyLearn](https://twitter.com/alchemyLearn). And if you want to connect directly with Vito, feel free to reach out to him on Twitter at [@VitoStack](https://twitter.com/VittoStack).
-
-Alchemy is revolutionizing the landscape of blockchain development and making it more accessible and efficient for everyone involved. Happy building with Alchemy!
+Take a breather. Remember, breaks enhance productivity. Till next time, continue to strive for greatness in every line of code you write!
