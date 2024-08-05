@@ -1,22 +1,72 @@
-# Why L2
+# Introduction to Alchemy
 
-## Introduction
+## Alchemy: A Game Changer for Decentralized Application Development
 
-In previous lessons, we deployed to the Sepolia testnet and started working with the Layer 2 solution ZK Sync. Deploying to Sepolia simulates deployment to the Ethereum mainnet, offering a comprehensive understanding of Layer 1 deployments. However, it's important to note that most projects today prefer deploying to Layer 2 solutions rather than directly to Ethereum due to the high costs associated with deployments.
+Innovation in the blockchain industry has come a long way, with powerful tools making their way into the ecosystem to support developers and bring efficiency to their workflows. Among these tools is Alchemy, and today we have Vito, the lead developer experience at Alchemy, to walk us through the platform, its features, and how you can leverage it to exponentially increase your productivity.
 
-### Gas Usage
+## What is Alchemy?
 
-When deploying to a ZK Sync local node, a `/broadcast` folder is created, containing a lot of detailed deployment transaction information. For instance, in our `run-latest.json` file, we can see the `gasUsed` value and we can convert this hexadecimal number `0x5747A` to its decimal equivalent by typing `cast to base 0x5747A dec`. This conversion allows us to estimate the deployment cost on the Ethereum mainnet. By checking recent gas prices on Etherscan, we can calculate the total cost using the formula:
+Alchemy is a platform equipped with APIs, SDKs, and libraries to enhance your developer experience while working on Web3 projects. Think of Alchemy as the AWS of Web3. It functions as a node provider and developer tooling platform predominantly used in thousands of Web3 and Web2 applications, including large Web2 corporations like Adobe, Shopify, and Stripe.
 
-`Total Cost = Gas Used * Gas Price`
+The need for platforms such as Alchemy arises from the fact that, as a developer, you don't usually have to worry about running the servers your code operates on or developing the deployment and integration pipelines for your application. Instead, you use services such as AWS, Azure, and Google Cloud for that—Alchemy does the same but for Web3.
 
-We can see this total cost in the deployment transaction on [Sepolia Etherscan](https://sepolia.etherscan.io/tx/0xc496b9d30df33aa9285ddd384c14ce2a58eef470898b5cda001d0f4a21b017f6), under the `Transaction Fee` section. In this case, `357,498` gas will costs `0.000279288255846978` ETH, which today is equivalent to \$7.
+## How Does Alchemy Work?
 
-Deploying even a minimal contract like `SimpleStorage` on Ethereum can be expensive. Larger contracts, with thousands of lines of code, can cost thousands of dollars. This is why many developers prefer deploying to Layer 2 solutions like ZK Sync, which offer the same security as Ethereum but at a fraction of the cost.
+Alchemy enhances your developer experience through a combination of features. The platform's primary component is the _Supernode_, a proprietary blockchain engine that works as a load balancer on top of your node.
 
-### Deploying to ZK Sync Sepolia
+Like its name suggests, the Supernode ensures data from the blockchain is always up-to-date and readily available. Using the Supernode as a foundation, Alchemy has built the _Enhanced APIs_—a set of APIs that makes pulling data from the blockchain a breeze.
 
-Deploying to ZK Sync Sepolia is similar to deploying to a ZK Sync local node. You can retrieve a ZK Sync Sepolia RPC URL from [Alchemy](https://www.alchemy.com/) by creating a new app based on the ZK Sepolia network. Then, you can proceed to add the `ZKSYNC_RPC_URL` to your `.env` configuration.
+To put it simply, the Alchemy Supernode sits at the core of its ecosystem, powering up functionalities like Enhanced APIs and monitoring tools while supporting multiple chains.
 
-> 🗒️ **NOTE**
-> To understand the cost benefits of Layer 2 solutions, visit [L2Fees.info](https://l2fees.info) and compare the significant cost differences between sending a transaction on Ethereum and ZK Sync Era.
+What follows is a step-by-step guide on how to create a new account on Alchemy and leverage this platform to its full extent:
+
+## Creating a New Account on Alchemy
+
+Creating an account on Alchemy is not only easy but also completely free. You can also freely scale your applications up using the platform's generous premium plans.
+
+### Step 1: Navigate to Alchemy.com
+
+Head over to [Alchemy.com](https://www.alchemy.com/) and create a new account.
+
+#### Step 2: Create a New Application
+
+Once you have signed in, create a new application.
+
+Next, give your application a name and a description. Then, select a chain and network. Alchemy currently supports the majority of EVM-compatible chains, including:
+
+- Ethereum
+- Polygon (POS)
+- Zkevm
+- Optimism
+- Astar
+- Solana (non-EVM chain)
+
+## The Application-Specific Dashboard
+
+Once your application is up and running, you will have access to the application-specific dashboard. This dashboard provides crucial insights into your application and infrastructure health, such as latency, compute units, and transaction success rate, which can be valuable for debugging and identifying issues.
+
+If you observe a lower success rate for your transactions, go to the "Recent Invalid Request" tab. This will list all unsuccessful requests along with the reasons for their failure, making it easier for you to debug and fix issues.
+
+## Mempool Watcher
+
+Another powerful tool provided by Alchemy is the Mempool watcher. Picture it as Ethereum's mempool, where all pending transactions reside waiting for validation or mining.
+
+The Mempool watcher provides extensive details about your transactions, such as:
+
+- Transaction status (mined, pending, dropped, replaced)
+- Gas used
+- Time taken for validation
+- Transaction value
+- Sender's and receiver's address
+
+This detailed transaction tracking allows you to have a better understanding of each transaction and aids immensely in debugging specific issues related to individual transactions.
+
+## Wrapping Up
+
+To sum up, Alchemy is a revolutionary platform that brings a plethora of tools to aid your Web3 development experience. From Supernode to Enhanced APIs and crucial troubleshooting tools, Alchemy is undeniably a game changer in the world of decentralized applications.
+
+"Alchemy can be a powerful asset to any blockchain developer, offering a simplified experience in an inherently complicated Web3 environment." – Vito, Lead Developer Experience at Alchemy.
+
+Vito suggests that you check out Alchemy's [documentation](https://docs.alchemy.com/) to explore more about the platform, its APIs, SDKs, libraries, and tools. Also, don't forget to follow them on Twitter at [@AlchemyPlatform](https://twitter.com/alchemyplatform) and [@AlchemyLearn](https://twitter.com/alchemyLearn). And if you want to connect directly with Vito, feel free to reach out to him on Twitter at [@VitoStack](https://twitter.com/VittoStack).
+
+Alchemy is revolutionizing the landscape of blockchain development and making it more accessible and efficient for everyone involved. Happy building with Alchemy!
