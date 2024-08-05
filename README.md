@@ -1,30 +1,22 @@
-# Tx Types
+# Why L2
 
 ## Introduction
 
-In this lesson, we will explore the different transaction types within the ZK Sync VM and EVM ecosystems.
+In previous lessons, we deployed to the Sepolia testnet and started working with the Layer 2 solution ZK Sync. Deploying to Sepolia simulates deployment to the Ethereum mainnet, offering a comprehensive understanding of Layer 1 deployments. However, it's important to note that most projects today prefer deploying to Layer 2 solutions rather than directly to Ethereum due to the high costs associated with deployments.
 
-### `/broadcast` Folder
+### Gas Usage
 
-When deploying to a zkSync local node, a `/broadcast` folder will be created and it will contain detailed information about the **deployment transactions**. Inside this folder, you will find subfolders named after specific deployment chain IDs, such as **`260`** for ZK Sync and **`31337`** for Anvil. These subfolders store the data of the transactions executed during the deployment process.
+When deploying to a ZK Sync local node, a `/broadcast` folder is created, containing a lot of detailed deployment transaction information. For instance, in our `run-latest.json` file, we can see the `gasUsed` value and we can convert this hexadecimal number `0x5747A` to its decimal equivalent by typing `cast to base 0x5747A dec`. This conversion allows us to estimate the deployment cost on the Ethereum mainnet. By checking recent gas prices on Etherscan, we can calculate the total cost using the formula:
 
-By examining both the `run-latest.json` file in these folders, we can observe different **transaction types** for each transaction within a chain. For instance, transactions on the Anvil chain might be labeled as type **`0x2`**, while those on the zkSync chain will be of type \*\* `0x0`\*\*. Deploying a smart contract on the EVM without the `--legacy` flag results in a default transaction type of `0x2`. Adding the `--legacy` flag changes it to type `0x0`.
+`Total Cost = Gas Used * Gas Price`
 
-The EVM and ZK Sync ecosystems support multiple transaction types to accommodate various Ethereum Improvement Proposals (EIPs). Initially, Ethereum had only one transaction type (`0x0` legacy), but as the ecosystem evolved, multiple types were introduced through various EIPs. Subsequent types include type 1, which introduces an _access list_ of addresses and keys, and type 2, also known as [EIP 1559](https://eips.ethereum.org/EIPS/eip-1559) transactions.
+We can see this total cost in the deployment transaction on [Sepolia Etherscan](https://sepolia.etherscan.io/tx/0xc496b9d30df33aa9285ddd384c14ce2a58eef470898b5cda001d0f4a21b017f6), under the `Transaction Fee` section. In this case, `357,498` gas will costs `0.000279288255846978` ETH, which today is equivalent to \$7.
 
-> 👀❗**IMPORTANT**
-> This `0x2` type is the current default type for the EVM.
+Deploying even a minimal contract like `SimpleStorage` on Ethereum can be expensive. Larger contracts, with thousands of lines of code, can cost thousands of dollars. This is why many developers prefer deploying to Layer 2 solutions like ZK Sync, which offer the same security as Ethereum but at a fraction of the cost.
 
-Additionally, ZK Sync introduces its [unique transaction type](https://docs.zksync.io/zk-stack/concepts/transaction-lifecycle#eip-712-0x71), the type `113` (`0x71` in hex), which can enable features like [account abstraction](https://docs.zksync.io/build/developer-reference/account-abstraction/).
+### Deploying to ZK Sync Sepolia
 
-> 💡 **TIP**
-> The `forge script` command will work in some scenarios, but it’s not entirely clear where it might fail. For the purpose of this course, we will assume scripting does not work while working with Sync.
+Deploying to ZK Sync Sepolia is similar to deploying to a ZK Sync local node. You can retrieve a ZK Sync Sepolia RPC URL from [Alchemy](https://www.alchemy.com/) by creating a new app based on the ZK Sepolia network. Then, you can proceed to add the `ZKSYNC_RPC_URL` to your `.env` configuration.
 
-### Resources
-
-- [zkSync documentation](https://docs.zksync.io/zk-stack/concepts/transaction-lifecycle#transaction-types) about transaction types
-- [Cyfrin Blog on EIP-4844](https://www.cyfrin.io/blog/what-is-eip-4844-proto-danksharding-and-blob-transactions)
-
-### Conclusion
-
-The ZK Sync VM and EVM ecosystems support various transaction types to meet different EIP requirements. By examining deployment folders and understanding the use of flags like `--legacy`, we can effectively distinguish between these transaction types.
+> 🗒️ **NOTE**
+> To understand the cost benefits of Layer 2 solutions, visit [L2Fees.info](https://l2fees.info) and compare the significant cost differences between sending a transaction on Ethereum and ZK Sync Era.
