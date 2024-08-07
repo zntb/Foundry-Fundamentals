@@ -1,81 +1,52 @@
-# Debug your Solidity tests
+# Advanced deploy scripts
 
-First failed test
-Let's continue writing tests for our FundMe contract. Let's test if the owner (which should be us) is recorded properly.
+## Writing Deploy Scripts
 
-Add the following function to your testing file:
+When we went straight to testing we left behind a very important element, deploy scripts. Why is this important you ask? Because we need a certain degree of flexibility that we can't obtain in any other way, let's look through the two files `FundMe.sol` and `PriceConverter.sol`, we can see that both have an address (`0x694AA1769357215DE4FAC081bf1f309aDC325306`) hardcoded for the AggregatorV3Interface. This address is valid, it matches the AggregatorV3 on Sepolia ... but what if we want to test on Anvil? What if we deploy on mainnet or Arbitrum? What then?
+
+The deploy script is the key to overcome this problem!
+
+Create a new file called `DeployFundMe.s.sol` in `script` folder. Please use the `.s.sol` naming convention.
+
+We start with stating the SPDX and pragma:
 
 ```solidity
-function testOwnerIsMsgSender() public {
-  assertEq(fundMe.i_owner(), msg.sender);
+SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.18;
+```
+
+After that, we need the imports. We are working on a Foundry Script, thus the next logical step is to import `Script.sol`
+
+```solidity
+import { Script } from "forge-std/Script.sol";
+```
+
+Another thing that we need for our deploy script to work is (drumroll) to import the contract we want to deploy.
+
+```solidity
+import { FundMe } from "../src/FundMe.sol";
+```
+
+We are ready to define the contract. Remember how we did scripts a couple of lessons ago? Try to do it yourself.
+
+```solidity
+// SPDX-License_identifier: MIT
+
+pragma solidity ^0.8.18;
+
+import { Script } from "forge-std/Script.sol";
+import { FundMe } from "../src/FundMe.sol";
+
+contract DeployFundMe is Script {
+  function run() external {
+    vm.startBroadcast();
+    new FundMe();
+    vm.stopBroadcast();
+  }
 }
 ```
 
-Run it via `forge test`.
+Now let's try it with `forge script DeployFundMe`.
 
-Output:
-
-```bash
-Ran 2 tests for test/FundMe.t.sol:FundMeTest
-[PASS] testMinimumDollarIsFive() (gas: 5453)
-[FAIL. Reason: assertion failed] testOwnerIsMsgSender() (gas: 22521)
-Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 3.85ms (623.00µs CPU time)
-
-Ran 1 test suite in 367.24ms (3.85ms CPU time): 1 tests passed, 1 failed, 0 skipped (2 total tests)
-
-Failing tests:
-Encountered 1 failing test in test/FundMe.t.sol:FundMeTest
-
-[FAIL. Reason: assertion failed] testOwnerIsMsgSender() (gas: 22521)
-```
-
-So ... why did it fail? Didn't we call the `new FundMe()`; to deploy, making us the owner?
-
-We can find the answer to these questions in various ways, in the last lesson we learned about console.log, let's add some console.logs to see more information about the two elements of the assertion.
-
-```solidity
-function testOwnerIsMsgSender() public {
-  console.log(fundMe.i_owner());
-  console.log(msg.sender);
-  assertEq(fundMe.i_owner(), msg.sender);
-}
-```
-
-Let's run forge `test -vv`:
-
-```bash
-Ran 2 tests for test/FundMe.t.sol:FundMeTest
-[PASS] testMinimumDollarIsFive() (gas: 5453)
-[FAIL. Reason: assertion failed] testOwnerIsMsgSender() (gas: 26680)
-Logs:
-  0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496
-  0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
-  Error: a == b not satisfied [address]
-        Left: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496
-       Right: 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
-
-Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 975.40µs (449.20µs CPU time)
-
-Ran 1 test suite in 301.60ms (975.40µs CPU time): 1 tests passed, 1 failed, 0 skipped (2 total tests)
-
-Failing tests:
-Encountered 1 failing test in test/FundMe.t.sol:FundMeTest
-
-[FAIL. Reason: assertion failed] testOwnerIsMsgSender() (gas: 26680)
-```
-
-Ok, so the addresses are different, but why?
-
-Technically we are not the ones that deployed the `FundMe` contract. The `FundMe` contract was deployed by the `setUp` function, which is part of the `FundMeTest` contract. So, even though we are the ones who called `setUp` via `forge test`, the actual testing contract is the deployer of the `FundMe` contract.
-
-To test the above let's tweak the `testOwnerIsMsgSender` function:
-
-```solidity
-function testOwnerIsMsgSender() public {
-  assertEq(fundMe.i_owner(), address(this));
-}
-```
-
-Run `forge test`. It passes! Congratulations!
-
-Feel free to try and write other tests!
+Everything was ok! Congrats!
