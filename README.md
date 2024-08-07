@@ -1,89 +1,112 @@
-# Running tests on chains forks
+# Refactoring your tests
 
-_Follow along with this video:_
+## Refactoring code and test
 
----
+The way our code is currently structured is not that flexible. Given the hardcoded Sepolia address we cannot deploy to other chains, and if we wish to do so we would have to come and copy-paste another address everywhere throughout the code. In bigger codebases, with multiple addresses / other items to copy-paste for each deployment (in case we deploy on multiple chains) this update activity is extremely prone to error. We can do better.
 
-## Forking tests
+To fix this we can make our project more modular, which would help improve de maintainability, testing and deployment. This is done by moving the hardcoded changing variables to the constructor, thus regardless of the chain we deploy our contracts to, we provide the chain-specific elements once, in the constructor, and then we are good to go.
 
-This course will cover 4 different types of tests:
+Changing code without changing its functionality bears the name of **refactoring**.
 
-- **Unit tests**: Focus on isolating and testing individual smart contract functions or functionalities.
-- **Integration tests**: Verify how a smart contract interacts with other contracts or external systems.
-- **Forking tests**: Forking refers to creating a copy of a blockchain state at a specific point in time. This copy, called a fork, is then used to run tests in a simulated environment.
-- **Staging tests**: Execute tests against a deployed smart contract on a staging environment before mainnet deployment.
+Do the following modifications in `FundMe.sol`
 
-Coming back to our contracts, the central functionality of our protocol is the `fund` function.
-
-For that to work, we need to be sure that Aggregator V3 runs the current version. We know from previous courses that the version returned needs to be `4`. Let's put it to the test!
-
-Add the following code to your test file:
+1. In the storage variables section create a new variable:
 
 ```solidity
-function testPriceFeedVersionIsAccurate() public {
-  uint256 version = fundMe.getVersion();
-  assertEq(version, 4);
+AggregatorV3Interace private s_priceFeed;
+```
+
+1. We need to add this as an input in our constructor and assign it to the state variable. This is done as follows:
+
+```solidity
+constructor(address priceFeed) {
+  i_owner = msg.sender;
+  s_priceFeed = AggregatorV3Interface(priceFeed);
 }
 ```
 
-It ... fails. But why? Looking through the code we see this AggregatorV3 address `0x694AA1769357215DE4FAC081bf1f309aDC325306` over and over again. The address is correct, is the Sepolia deployment of the AggregatorV3 contract. But our tests use Anvil for testing purposes, so that doesn't exist.
+1. Inside the `getVersion` function, where AggregatorV3Interface is invoked, replace the hardcoded address with the state variable s_priceFeed:
 
-**Note: Calling `forge test` over and over again when you are testing is not always efficient, imagine you have tens or hundreds of tests, some of them taking seconds to finish. From now on, when we test specific things let's use the following:**
-
-`forge test --mt testPriceFeedVersionIsAccurate`
-
-Back to our problem, how can we fix this?
-
-Forking is the solution we need. If we run the test on an anvil instance that copies the current Sepolia state, where AggregatorV3 exists at that address, then our test function will not revert anymore. For that, we need a Sepolia RPC URL.
-
-Remember how in a [previous lesson we delpoyed a smart contract on Sepolia](https://updraft.cyfrin.io/courses/foundry/foundry-simple-storage/deploying-smart-contract-testnet-sepolia)? It's similar, we can use the same RPC we used back then.
-
-Thus:
-
-1. Create a .env file. (Also make sure that your `.gitignore` file contains the `.env` entry)
-2. In the `.env` file create a new entry as follows:
-
-```env
-SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOURAPIKEYWILLGOHERE
+```solidity
+function getVersion() public view returns (uint256) {
+  AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeed);
+  return priceFeed.version();
+}
 ```
 
-1. Run `source .env` in your terminal;
-2. Run `forge test --mt testPriceFeedVersionIsAccurate --fork-url $SEPOLIA_RPC_URL`
+In `PriceConverter.sol` modify the getPrice function to take an input `function getPrice(AggregatorV3Interface priceFeed) internal view returns (uint256) {` and delete the `AggregatorV3Interface priceFeed = AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306);` line;
 
-```shell
-Ran 1 test for test/FundMe.t.sol:FundMeTest
-[PASS] testPriceFeedVersionIsAccurate() (gas: 14118)
+In the same library update `getConversionRate` to take a `priceFeed` input and update the first line to pass the required `AggregatorV3Interface` to the `getPrice` function:
 
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.29s (536.03ms CPU time)
+```solidity
+function getConversionRate(
+  uint256 ethAmount,
+  AggregatorV3Interface priceFeed
+) internal view returns (uint256) {
+  uint256 ethPrice = getPrice(priceFeed);
+  uint256 ethAmountInUsd = (ethPrice * ethAmount) / 1000000000000000000;
+  // the actual ETH/USD conversion rate, after adjusting the extra 0s.
+  return ethAmountInUsd;
+}
 ```
 
-Nice!
+1. Back in FundMe.sol pass the s_priceFeed as input for `getConversionRate` in the `fund` function.
 
-Please keep in mind that forking uses the alchemy API, it's not a good idea to run all your tests on a fork every single time. But, sometimes as in this case, you can't test without. It's very important that our test have a high **coverage**, to ensure all our code is battle tested.
+Take a moment and think if we missed updating anything in our project.
 
-### Coverage
+Ready? The deploy script is not providing the `priceFeed` as an input when calling `new FundMe();`, also, the `setUp` function in `FundMe.t.sol` is not providing the `priceFeed` as an input when calling `fundMe = new FundMe();`.
 
-Foundry provides a way to calculate the coverage. You can do that by calling `forge coverage`. This command displays which parts of your code are covered by tests. Read more about its options [here](https://book.getfoundry.sh/reference/forge/forge-coverage?highlight=coverage#forge-coverage).
+For now, let's hardcode the address `0x694AA1769357215DE4FAC081bf1f309aDC325306` in both places.
 
-```shell
-forge coverage --fork-url $SEPOLIA_RPC_URL
+As you've figured out this isn't ideal either. Every time we want to do something from now on do we have to update in both places? Not good.
+
+Update the `run` function from the `DeployFundMe` script:
+
+```solidity
+function run() external returns (FundMe fundMe) {
+  vm.startBroadcast();
+  fundMe = new FundMe(0x694AA1769357215DE4FAC081bf1f309aDC325306);
+  vm.stopBroadcast();
+}
 ```
 
-```shell
-Ran 3 tests for test/FundMe.t.sol:FundMeTest
-[PASS] testMinimumDollarIsFive() (gas: 5759)
-[PASS] testOwnerIsMsgSender() (gas: 8069)
-[PASS] testPriceFeedVersionIsAccurate() (gas: 14539)
-Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 1.91s (551.69ms CPU time)
+Now when we call run it returns the `FundMe` contract we deployed.
 
-Ran 1 test suite in 2.89s (1.91s CPU time): 3 tests passed, 0 failed, 0 skipped (3 total tests)
-| File                      | % Lines       | % Statements  | % Branches    | % Funcs      |
-| ------------------------- | ------------- | ------------- | ------------- | ------------ |
-| script/DeployFundMe.s.sol | 0.00% (0/3)   | 0.00% (0/3)   | 100.00% (0/0) | 0.00% (0/1)  |
-| src/FundMe.sol            | 21.43% (3/14) | 25.00% (5/20) | 0.00% (0/6)   | 33.33% (2/6) |
-| src/PriceConverter.sol    | 0.00% (0/6)   | 0.00% (0/11)  | 100.00% (0/0) | 0.00% (0/2)  |
+In `FundMe.t.sol`:
 
-| Total                     | 13.04% (3/23) | 14.71% (5/34) | 0.00% (0/6)   | 22.22% (2/9) |
+1. Let's import the deployment script into the `FundMe.t.sol`.
+
+```solidity
+import { DeployFundMe } from "../script/DeployFundMe.s.sol";
 ```
 
-These are rookie numbers! Maybe 100% is not feasible, but 13% is as good as nothing. In the next lessons, we will up our game and increase these numbers!
+1. Create a new state variable `DeployFundMe deployFundMe;`;
+
+2. Update the `setUp` function as follows:
+
+```solidity
+function setUp() external {
+  deployFundMe = new DeployFundMe();
+  fundMe = deployFundMe.run();
+}
+```
+
+Let's call a `forge test --fork-url $SEPOLIA_RPC_URL` to make sure everything compiles.
+
+Looks like the `testOwnerIsMsgSender` fails again. Take a moment and think about why.
+
+When we changed the method of deployment and made it go through the run command of the deployFundMe contract we also changed the owner.
+
+Note: `vm.startBroadcast` is special, it uses the address that calls the test contract or the address / private key provided as the sender. You can read more about it here.
+
+To account for the way `vm.startBroadcast` works please perform the following modification in `FundMe.t.sol`:
+
+```solidity
+function testOwnerIsMsgSender() public {
+  assertEq(fundMe.i_owner(), msg.sender);
+}
+```
+
+Run `forge test --fork-url $SEPOLIA_RPC_URL` again.
+
+Congrats!
