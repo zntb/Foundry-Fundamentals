@@ -1,54 +1,41 @@
-# Refactoring the mock smart contract
+# How to refactor magic number
 
-## Solving the Anvil problem
+## Magic numbers or `What was this exactly?`
 
-When we needed the Sepolia `priceFeed` we made sure that our deployments script pointed to it. How can we solve this in Anvil, because the contract that we need doesn't exist there. Simple, we deploy mocks.
+Magic numbers refer to literal values directly included in the code without any explanation or context. These numbers can appear anywhere in the code, but they're particularly problematic when used in calculations or comparisons. By using magic numbers you ensure your smart contract suffers from `Reduced Readability`, `Increased Maintenance Difficulty` and `Debugging Challenges`. You also make your work extremely prone to error, imagine you used the same magic number in 10 places and you want to change it. Will you remember all the 9 places or will you change it only in 8?
 
-Our `getAnvilEthConfig` function in `HelperConfig` must deploy a mock contract. After it deploys it we need it to return the mock address, so our contracts would know where to send their calls.
+**Don't be like that.**
 
-First of all, we need to make sure we import `Script.sol` in the `HelperConfig.s.sol` contract. Also, `HelperConfig` needs to inherit from `Script`. This will give us access to the `vm.startBroadcast`/`vm.stopBroadcast` functionality. We will use this to deploy our mocks. But ... what is a mock contract?
+Write clean, maintainable, and less error-prone code. You make your own life easier, you make your auditor(s) life easier. Use constants and configuration variables.
 
-**A mock contract is a special type of contract designed to simulate the behavior of another contract during testing.**
+Let's apply this.
 
-Update your start of the `HelperConfig.s.sol` file as follows:
+Open `HelperConfig.s.sol`, go to the `getAnvilEthConfig` function and delete the `8` corresponding to the decimals and `2000e8` corresponding to the `_initialAnswer` that are used inside the `MockV3Aggregator`'s constructor.
 
-```solidity
-import {Script} from "forge-std/Script.sol";
-
-contract HelperConfig is Script {
-
-```
-
-In order to be able to deploy a mock contract we need ... a mock contract. So, in `test` folder please create a new folder called `mocks`. Inside `mocks` create a new file `MockV3Aggregator.sol`. Rewriting the AggregatorV3 as a mock is not the easiest task out there. Please copy the contents of [this contract](https://github.com/Cyfrin/foundry-fund-me-f23/blob/main/test/mock/MockV3Aggregator.sol) into your newly created file.
-
-What next?
-
-We need to import this in our `HelperConfig.s.sol` file and deploy it in the `getAnvilEthConfig` then return the address.
-
-Perform the following changes in `HelperConfig`:
+At the top of the `HelperConfig` contract create two new variables:
 
 ```solidity
-import {MockV3Aggregator} from "../test/mocks/MockV3Aggregator.sol";
+uint8 public constant DECIMALS = 8;
 
-[...]
-    // In state variables section
-    MockV3Aggregator mockPriceFeed;
-[...]
-
-    function getAnvilEthConfig() public returns (NetworkConfig memory){
-
-        vm.startBroadcast();
-        mockPriceFeed = new MockV3Aggregator(8, 2000e8);
-        vm.stopBroadcast();
-
-        NetworkConfig memory anvilConfig = NetworkConfig({
-            priceFeed: address(mockPriceFeed)
-        });
-
-        return anvilConfig;
-
-    }
-
+int256 public constant INITIAL_PRICE = 2000e8;
 ```
 
-More testing and refactoring in the next lessons!
+Note: Constants are always declared in ALL CAPS!
+
+Now replace the deleted magic numbers with the newly created variables.
+
+```solidity
+function getAnvilEthConfig() public returns (NetworkConfig memory) {
+  vm.startBroadcast();
+  mockPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_PRICE);
+  vm.stopBroadcast();
+
+  NetworkConfig memory anvilConfig = NetworkConfig({
+    priceFeed: address(mockPriceFeed)
+  });
+
+  return anvilConfig;
+}
+```
+
+Awesome! Let's keep refactoring!
