@@ -1,112 +1,103 @@
-# Refactoring your tests
+# Deploy a mock priceFeed
 
-## Refactoring code and test
+## Testing locally
 
-The way our code is currently structured is not that flexible. Given the hardcoded Sepolia address we cannot deploy to other chains, and if we wish to do so we would have to come and copy-paste another address everywhere throughout the code. In bigger codebases, with multiple addresses / other items to copy-paste for each deployment (in case we deploy on multiple chains) this update activity is extremely prone to error. We can do better.
+In the previous lesson, we refactored our contracts to avoid being forced to use Sepolia every single time when we ran tests. The problem is we didn't quite fix this aspect. We made our contracts more flexible by changing everything for us to input the `priceFeed` address only once. We can do better!
 
-To fix this we can make our project more modular, which would help improve de maintainability, testing and deployment. This is done by moving the hardcoded changing variables to the constructor, thus regardless of the chain we deploy our contracts to, we provide the chain-specific elements once, in the constructor, and then we are good to go.
+It is very important to be able to run our all tests locally. We will do this using a `mock contract`.
 
-Changing code without changing its functionality bears the name of **refactoring**.
+Before we dive into the code, let's emphasize why this practice is so beneficial. By creating a local testing environment, you reduce your chances of breaking anything in the refactoring process, as you can test all changes before they go live. No more hardcoding of addresses and no more failures when you try to run a test without a forked chain. As a powerful yet simple tool, a mock contract allows you to simulate the behavior of a real contract without the need to interact with a live blockchain.
 
-Do the following modifications in `FundMe.sol`
+Thus, on our local Anvil blockchain we will deploy a contract that mimics the behavior of the Sepolia `priceFeed`.
 
-1. In the storage variables section create a new variable:
+### Where the magic happens
 
-```solidity
-AggregatorV3Interace private s_priceFeed;
-```
+Please create a new file in your `script` folder called `HelperConfig.s.sol`. Here we'll write the logic necessary for our script to deploy mocks when it detects we are performing tests on our local anvil chain. Also, here we will keep track of all the contract addresses we will use across all the different chains we will interact with.
 
-1. We need to add this as an input in our constructor and assign it to the state variable. This is done as follows:
+The start:
 
 ```solidity
-constructor(address priceFeed) {
-  i_owner = msg.sender;
-  s_priceFeed = AggregatorV3Interface(priceFeed);
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.19;
+
+import { Script } from "forge-std/Script.sol";
+
+contract HelperConfig {
+  // If we are on a local Anvil, we deploy the mocks
+  // Else, grab the existing address from the live network
 }
 ```
 
-1. Inside the `getVersion` function, where AggregatorV3Interface is invoked, replace the hardcoded address with the state variable s_priceFeed:
+Copy the following functions inside the contract:
 
 ```solidity
-function getVersion() public view returns (uint256) {
-  AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeed);
-  return priceFeed.version();
+struct NetworkConfig {
+  address priceFeed; // ETH/USD price feed address
 }
-```
 
-In `PriceConverter.sol` modify the getPrice function to take an input `function getPrice(AggregatorV3Interface priceFeed) internal view returns (uint256) {` and delete the `AggregatorV3Interface priceFeed = AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306);` line;
-
-In the same library update `getConversionRate` to take a `priceFeed` input and update the first line to pass the required `AggregatorV3Interface` to the `getPrice` function:
-
-```solidity
-function getConversionRate(
-  uint256 ethAmount,
-  AggregatorV3Interface priceFeed
-) internal view returns (uint256) {
-  uint256 ethPrice = getPrice(priceFeed);
-  uint256 ethAmountInUsd = (ethPrice * ethAmount) / 1000000000000000000;
-  // the actual ETH/USD conversion rate, after adjusting the extra 0s.
-  return ethAmountInUsd;
+function getSepoliaEthConfig() public pure returns (NetworkConfig memory) {
+  NetworkConfig memory sepoliaConfig = NetworkConfig({
+    priceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306
+  });
+  return sepoliaConfig;
 }
+
+function getAnvilEthConfig() public pure returns (NetworkConfig memory) {}
 ```
 
-1. Back in FundMe.sol pass the s_priceFeed as input for `getConversionRate` in the `fund` function.
+We decided to structure the information we need depending on the chain we are testing on. We use a `struct` to hold this information for every chain. You might think that we could have gotten away with a simple `address variable` but that changes if we need to store multiple addresses or even more blockchain-specific information.
 
-Take a moment and think if we missed updating anything in our project.
+For now, we created a `getSepoliaEthConfig` that returns the NetworkConfig struct, which contains the priceFeed address.
 
-Ready? The deploy script is not providing the `priceFeed` as an input when calling `new FundMe();`, also, the `setUp` function in `FundMe.t.sol` is not providing the `priceFeed` as an input when calling `fundMe = new FundMe();`.
+What do we need to do to integrate this inside the deployment script?
 
-For now, let's hardcode the address `0x694AA1769357215DE4FAC081bf1f309aDC325306` in both places.
+First of all, we need to be aware of the chain we are using. We can do this in the constructor of the HelperConfig contract.
 
-As you've figured out this isn't ideal either. Every time we want to do something from now on do we have to update in both places? Not good.
-
-Update the `run` function from the `DeployFundMe` script:
+Update the `HelperConfig` as follows:
 
 ```solidity
-function run() external returns (FundMe fundMe) {
-  vm.startBroadcast();
-  fundMe = new FundMe(0x694AA1769357215DE4FAC081bf1f309aDC325306);
-  vm.stopBroadcast();
-}
+    NetworkConfig public activeNetworkConfig;
+
+    struct NetworkConfig {
+        address priceFeed; // ETH/USD price feed address
+    }
+
+    constructor(){
+        if (block.chainid == 11155111) {
+            activeNetowrkConfig = getSepoliaEthConfig();
+        } else {
+            activeNetowrkConfig = getAnvilEthConfig();
+        }
+
+    }
 ```
 
-Now when we call run it returns the `FundMe` contract we deployed.
+As you can see, we've defined a new state variable, called activeNetworkConfig which will be the struct that gets queried for blockchain-specific information. We will check the `block.chainId` at the constructor level, and depending on that value we select the appropriate config.
 
-In `FundMe.t.sol`:
+The `block.chainId` in Ethereum refers to the unique identifier of the blockchain network in which the current block is being processed. This value is determined by the Ethereum network itself and is typically used by smart contracts to ensure that they are interacting with the intended network. Go on [chainlist.org](https://chainlist.org/) to find out the `ChainID`'s of different blockchains.
 
-1. Let's import the deployment script into the `FundMe.t.sol`.
+Let's update the `DeployFundMe.s.sol` to use our newly created HelperConfig.
+
+`import {HelperConfig} from "./HelperConfig.s.sol";`
+
+Add the following before the `vm.startBroadcast` line inside the `run` function:
 
 ```solidity
-import { DeployFundMe } from "../script/DeployFundMe.s.sol";
+        // The next line runs before the vm.startBroadcast() is called
+        // This will not be deployed because the `real` signed txs are happening
+        // between the start and stop Broadcast lines.
+        HelperConfig helperConfig = new HelperConfig();
+        address ethUsdPriceFeed = helperConfig.activeNetworkConfig();
+
 ```
 
-1. Create a new state variable `DeployFundMe deployFundMe;`;
+Run the `forge test --fork-url $SEPOLIA_RPC_URL` command to check everything is fine. All tests should pass.
 
-2. Update the `setUp` function as follows:
+Great, let's keep going.
 
-```solidity
-function setUp() external {
-  deployFundMe = new DeployFundMe();
-  fundMe = deployFundMe.run();
-}
-```
+Now that we've configured it for one chain, Sepolia, we can do the same with any other chain that has a `priceFeed` address available on [Chainlink Price Feed Contract Addresses](https://docs.chain.link/data-feeds/price-feeds/addresses?network=ethereum&page=1). Simply copy the `getSepoliaEthConfig` function, rename it and provide the address inside it. Then add a new block.chainId check in the constructor that checks the current `block.chainId` against the chainId you find on [chainlist.org](https://chainlist.org/). You would also need a new RPC_URL for the new blockchain you chose, which can be easily obtained from Alchemy.
 
-Let's call a `forge test --fork-url $SEPOLIA_RPC_URL` to make sure everything compiles.
+This type of flexibility elevates your development game to the next level. Being able to easily test your project on different chains just by changing your RPC_URL is an ability that differentiates you from a lot of solidity devs who fumble around with hardcoded addresses.
 
-Looks like the `testOwnerIsMsgSender` fails again. Take a moment and think about why.
-
-When we changed the method of deployment and made it go through the run command of the deployFundMe contract we also changed the owner.
-
-Note: `vm.startBroadcast` is special, it uses the address that calls the test contract or the address / private key provided as the sender. You can read more about it here.
-
-To account for the way `vm.startBroadcast` works please perform the following modification in `FundMe.t.sol`:
-
-```solidity
-function testOwnerIsMsgSender() public {
-  assertEq(fundMe.i_owner(), msg.sender);
-}
-```
-
-Run `forge test --fork-url $SEPOLIA_RPC_URL` again.
-
-Congrats!
+In the next lessons, we will learn how to use Anvil in our current setup. Stay tuned.
