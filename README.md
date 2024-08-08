@@ -1,41 +1,24 @@
-# How to refactor magic number
+# Refactoring the mock smart contract pt.2
 
-## Magic numbers or `What was this exactly?`
+## More refactoring
 
-Magic numbers refer to literal values directly included in the code without any explanation or context. These numbers can appear anywhere in the code, but they're particularly problematic when used in calculations or comparisons. By using magic numbers you ensure your smart contract suffers from `Reduced Readability`, `Increased Maintenance Difficulty` and `Debugging Challenges`. You also make your work extremely prone to error, imagine you used the same magic number in 10 places and you want to change it. Will you remember all the 9 places or will you change it only in 8?
+One thing that we should do that would make our `getAnvilEthConfig` more efficient is to check if we already deployed the `mockPriceFeed` before deploying it once more.
 
-**Don't be like that.**
+Remember how addresses that were declared in state, but weren't attributed a value default to address zero? We can use this to create our check.
 
-Write clean, maintainable, and less error-prone code. You make your own life easier, you make your auditor(s) life easier. Use constants and configuration variables.
-
-Let's apply this.
-
-Open `HelperConfig.s.sol`, go to the `getAnvilEthConfig` function and delete the `8` corresponding to the decimals and `2000e8` corresponding to the `_initialAnswer` that are used inside the `MockV3Aggregator`'s constructor.
-
-At the top of the `HelperConfig` contract create two new variables:
+Right below the `function getAnvilEthConfig() public returns ...` line add the following:
 
 ```solidity
-uint8 public constant DECIMALS = 8;
+        if (activeNetworkConfig.priceFeed != address(0)) {
+            return activeNetworkConfig;
 
-int256 public constant INITIAL_PRICE = 2000e8;
+        }
 ```
 
-Note: Constants are always declared in ALL CAPS!
+`getAnvilEthConfig` is not necessarily the best name. We are deploying something inside it, which means we are creating a new mockPriceFeed. Let's rename the function to `getOrCreateAnvilEthConfig`. Replace the name in the constructor.
 
-Now replace the deleted magic numbers with the newly created variables.
+Remember how `testPriceFeedVersionIsAccurate` was always failing when we didn't provide the option `--fork-url $SEPOLIA_RPC_URL`? Try running forge test. Try running forge test `--fork-url $SEPOLIA_RPC_URL`.
 
-```solidity
-function getAnvilEthConfig() public returns (NetworkConfig memory) {
-  vm.startBroadcast();
-  mockPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_PRICE);
-  vm.stopBroadcast();
+Everything passes! Amazing! Our test just became network agnostic. Next-level stuff!
 
-  NetworkConfig memory anvilConfig = NetworkConfig({
-    priceFeed: address(mockPriceFeed)
-  });
-
-  return anvilConfig;
-}
-```
-
-Awesome! Let's keep refactoring!
+Take a break, come back in 15 minutes and let's go on!
