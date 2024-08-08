@@ -1,147 +1,222 @@
-# Foundry tests cheatcodes
+# Adding more coverage to the tests
 
-## Foundry magic: Cheatcodes
+Let's keep testing
+In the previous lesson, we tested if the `s_addressToAmountFunded` is updated correctly. Continuing from there we need to test that funders array is updated with `msg.sender`.
 
-Now that we fixed our deployment script, and our tests have become blockchain agnostic, let's get back to increasing that coverage we were talking about some lessons ago.
-
-**Reminder:** Call `forge coverage` in your terminal. We need to bring that total coverage percentage as close to 100% as we can! Not all things require 100% coverage, or maybe achieving 100% coverage is too time expensive, but ... 12-13%? That is a joke, we can do way better than that.
-
-Let's take a moment and look at the `fund` function from `FundMe.sol`. What should it do?
-
-1. `require(msg.value.getConversionRate(s_priceFeed) >= MINIMUM_USD` this means that `fund` should revert if our `msg.value` converted in USDC is lower than the `MINIMUM_USD`;
-2. `addressToAmountFunded[msg.sender] += msg.value;` The `addressToAmountFunded` mapping should be updated appropriately to show the funded value;
-3. The `funders` array should be updated with `msg.sender`;
-
-To test all these we will employ some of Foundry's main features ... it's `Cheatcodes`. As Foundry states in the Foundry Book: "Cheatcodes give you powerful assertions, the ability to alter the state of the EVM, mock data, and more.". Read more about them [here](https://book.getfoundry.sh/cheatcodes/).
-
-To test point 1 we will use one of the most important cheatcodes: `expectRevert` (read more about it [here](https://book.getfoundry.sh/cheatcodes/expect-revert)).
-
-Open `FundMe.t.sol` and add the following function:
+Add the following test to your `FundMe.t.sol`:
 
 ```solidity
-function testFundFailsWIthoutEnoughETH() public {
-  vm.expectRevert(); // <- The next line after this one should revert! If not test fails.
-  fundMe.fund(); // <- We send 0 value
+function testAddsFunderToArrayOfFunders() public {
+  vm.startPrank(alice);
+  fundMe.fund{ value: SEND_VALUE }();
+  vm.stopPrank();
+
+  address funder = fundMe.getFunder(0);
+  assertEq(funder, alice);
 }
 ```
 
-We are attempting to fund the contract with `0` value, it reverts and our test passes.
+What's happening here? We start with our user `alice` who calls `fundMe.fund` in order to fund the contract. Then we use the `getter` function we created in the previous lesson to query what is registered inside the `funders` array at index `0`. We then use the assertEq cheatcode to compare the address we queried against `alice`.
 
-Before jumping on points 2 and 3, let's refactor our code a little bit.
-As we've discussed before storage variables should start with `s_`. Change all the `addressToAmountFunded` mentions to `s_addressToAmountFunded` and all the `funders` to `s_funders`. Another quick refactoring we need to do is to change the visibility of `s_addressToAmountFunded` and `s_funders` to private. Private variables are more gas-efficient than public ones.
+Run the test using `forge test --mt testAddsFunderToArrayOfFunders`. It passed, perfect!
 
-Call a quick `forge test` to make sure nothing broke anywhere.
+Each of our tests uses a fresh `setUp`, so if we run all of them and `testFundUpdatesFundDataStrucutre` calls `fund`, that won't be persistent for `testAddsFunderToArrayOfFunders`.
 
-Now that we made those two variables private, we need to write some getters for them, i.e. view functions that we will use to query the state of our smart contract.
+Moving on, we should test the `withdraw` function. Let's check that only the owner can `withdraw`.
 
-Please add the following at the end of `FundMe.sol`:
-
-```solidity
-/** Getter Functions */
-
-function getAddressToAmountFunded(
-  address fundingAddress
-) public view returns (uint256) {
-  return s_addressToAmountFunded[fundingAddress];
-}
-
-function getFunder(uint256 index) public view returns (address) {
-  return s_funders[index];
-}
-```
-
-Pfeww! Great now we can test points 2 and 3 indicated above:
-
-Add the following test in `FundMe.t.sol`:
+Add the following test to your `FundMe.t.sol`:
 
 ```solidity
-function testFundUpdatesFundDataStrucutre() public {
-  fundMe.fund{ value: 10 ether }();
-  uint256 amountFunded = fundMe.getAddressToAmountFunded(msg.sender);
-  assertEq(amountFunded, 10 ether);
-}
-```
-
-Run `forge test --mt testFundUpdatesFundDataStrucutre` in your terminal.
-
-Aaaand it fails! Why does it fail? Let's try it again, but this time put `address(this)` instead of `msg.sender`. Now it passed, but we still don't quite get why.
-
-User management is a very important aspect you need to take care of when writing tests. Imagine you are writing a more complex contract, where you have different user roles, maybe the `owner` has some privileges, different from an `admin` who has different privileges from a `minter`, who, as you've guessed, has different privileges from the `end user`. How can we differentiate all of them in our testing? We need to make sure we can write tests about who can do what.
-
-As always, Foundry can help us with that. Please remember the cheatcodes below, you are going to use them thousands of times.
-
-1. [prank](https://book.getfoundry.sh/cheatcodes/prank)
-   "Sets msg.sender to the specified address for the next call. “The next call” includes static calls as well, but not calls to the cheat code address."
-
-2. [startPrank](https://book.getfoundry.sh/cheatcodes/start-prank) and [stopPrank](https://book.getfoundry.sh/cheatcodes/stop-prank)
-   `startPrank` Sets msg.sender for all subsequent calls until `stopPrank` is called. It works a bit like `vm.startBroadcast` and `vm.stopBroadcast` we used to write our deployment script. Everything between the `vm.startPrank` and `vm.stopPrank` is signed by the address you provide inside the ().
-
-Ok, cool, but who is the actual user that we are going to use in one of the cheatcodes above? We have another cheatcode for this. To create a new user address we can use the `makeAddr` cheatcode. Read more about it [here](https://book.getfoundry.sh/reference/forge-std/make-addr?highlight=mak#makeaddr).
-
-Add the following line at the start of your `FundMeTest` contract:
-
-```solidity
-address alice = makeAddr("alice");
-```
-
-Now whenever we need a user to call a function we can use `prank` and `alice` to run our tests.
-
-To further increase the readability of our contract, let's avoid using a magic number for the funded amount. Create a constant variable called `SEND_VALUE` and give it the value of `0.1 ether` (don't be scared by the floating number which technically doesn't work with Solidity - `0.1 ether` means `10 \*\* 17 ether`).
-
-Back to our test, add the following test in `FundMe.t.sol`:
-
-```solidity
-function testFundUpdatesFundDataStrucutre() public {
+function testOnlyOwnerCanWithdraw() public {
   vm.prank(alice);
   fundMe.fund{ value: SEND_VALUE }();
-  uint256 amountFunded = fundMe.getAddressToAmountFunded(alice);
-  assertEq(amountFunded, SEND_VALUE);
+
+  vm.expectRevert();
+  vm.prank(alice);
+  fundMe.withdraw();
 }
 ```
 
-Finally, now let's run `forge test --mt testFundUpdatesFundDataStrucutre` again.
+What's happening here? We start with our user `alice` who calls f`undMe.fund` in order to fund the contract. We then use Alice's address to try and withdraw. Given that Alice is not the owner of the contract, it should fail. That's why we are using the `vm.expectRevert` cheatcode.
 
-It fails ... again!
+REMEMBER: Whenever you have a situation where two or more `vm` cheatcodes come one after the other keep in mind that these would ignore one another. In other words, when we call `vm.expectRevert();` that won't apply to `vm.prank(alice);`, it will apply to the withdraw call instead. The same would have worked if these had been reversed. Cheatcodes affect transactions, not other cheatcodes.
 
-But why? Let's call `forge test --mt testFundUpdatesFundDataStrucutre -vvv` to get more information about where and why it fails.
+Run the test using `forge test --mt testOnlyOwnerCanWithdraw`. It passed, amazing!
 
-```bash
-Ran 1 test for test/FundMe.t.sol:FundMeTest
-[FAIL. Reason: EvmError: Revert] testFundUpdatesFundDataStrucutre() (gas: 16879)
-Traces:
-  [16879] FundMeTest::testFundUpdatesFundDataStrucutre()
-    ├─ [0] VM::prank(alice: [0x328809Bc894f92807417D2dAD6b7C998c1aFdac6])
-    │   └─ ← [Return]
-    ├─ [0] FundMe::fund{value: 100000000000000000}()
-    │   └─ ← [OutOfFunds] EvmError: OutOfFunds
-    └─ ← [Revert] EvmError: Revert
+As you can see, in both `testAddsFunderToArrayOfFunders` and `testOnlyOwnerCanWithdraw` we used `alice` to fund the contract. Copy-pasting the same snippet of code over and over again, if we end up writing hundreds of tests, is not necessarily the best approach. We can see each line of code/block of lines of code as a building block. Multiple tests will share some of these building blocks. We can define these building blocks using modifiers to dramatically increase our efficiency in writing tests.
 
-
-Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 696.30µs (25.10µs CPU time)
-```
-
-How can someone fund our FundMe contract when they have 0 balance? They can't.
-
-We need a way to give `alice` some ether to be able to use her address for testing purposes.
-
-Foundry to the rescue! There's always a cheatcode to help you overcome your hurdles.
-
-deal allows us to set the ETH balance of a user. Read more about it [here](https://book.getfoundry.sh/cheatcodes/deal).
-
-Add the following line at the end of the setup.
+Add the following modifier to your `FundMe.t.sol`:
 
 ```solidity
-vm.deal(alice, STARTING_BALANCE);
+    modifier funded() {
+        vm.prank(alice);
+        fundMe.fund{value: SEND_VALUE}();
+        assert(address(fundMe).balance > 0);
+        _;
+
+    }
 ```
 
-Declare the `STARTING_BALANCE` as a constant variable up top:
+We first use the `vm.prank` cheatcode to signal the fact that the next transaction will be called by `alice`. We call `fund` and then we assert that the balance of the `fundMe` contract is higher than 0, if true, it means that Alice's transaction was successful. Every single time we need our contract funded we can use this modifier to do it.
+
+Refactor the previous test as follows:
 
 ```solidity
-uint256 constant STARTING_BALANCE = 10 ether;
+function testOnlyOwnerCanWithdraw() public funded {
+  vm.expectRevert();
+  fundMe.withdraw();
+}
 ```
 
-Let's run `forge test --mt testFundUpdatesFundDataStrucutre` again.
+Slim and efficient!
 
-And now it passes. Congratulations!
+Ok, we've tested that a non-owner cannot withdraw. But can the owner withdraw?
 
-I know a lot of new cheatcodes were introduced in this lesson. Keep in mind that these are the most important cheatcodes there are, and you are going to use them over and over again. Regardless if you are developing or auditing a project, that project will always have at least an `owner` and a `user`. These two would always have different access to different functionalities. Most of the time the user needs some kind of balance, be it ETH or some other tokens. So, making a new address, giving it some balance, and pranking it to act as a caller for a tx will 100% be part of your every test file.
+To test this we will need a new getter function. Add the following to the `FundMe.sol` file next to the other getter functions:
+
+```solidity
+function getOwner() public view returns (address) {
+  return i_owner;
+}
+```
+
+Make sure to make `i_owner` private.
+
+Cool!
+
+Let's discuss more about structuring our tests.
+
+The arrange-act-assert (AAA) methodology is one of the simplest and most universally accepted ways to write tests. As the name suggests, it comprises three parts:
+
+- Arrange: Set up the test by initializing variables, and objects and prepping preconditions.
+
+- Act: Perform the action to be tested like a function invocation.
+
+- Assert: Compare the received output with the expected output.
+
+We will start our test as usual:
+
+```solidity
+function testWithdrawFromASingleFunder() public funded {
+```
+
+Now we are in the first stage of the `AAA` methodology: `Arrange`
+
+We first need to check the initial balance of the owner and the initial balance of the contract.
+
+```solidity
+        uint256 startingFundMeBalance = address(fundMe).balance;
+
+        uint256 startingOwnerBalance = fundMe.getOwner().balance;
+```
+
+We have what we need to continue with the `Act` stage.
+
+```solidity
+        vm.startPrank(fundMe.getOwner());
+        fundMe.withdraw();
+
+        vm.stopPrank();
+```
+
+Our action stage is comprised of pranking the owner and then calling `withdraw`.
+
+We have reached our final testing part, the `Assert` stage.
+
+We need to find out the new balances, both for the contract and the owner. We need to check if these match the expected numbers:
+
+```solidity
+        uint256 endingFundMeBalance = address(fundMe).balance;
+        uint256 endingOwnerBalance = fundMe.getOwner().balance;
+        assertEq(endingFundMeBalance, 0);
+        assertEq(
+            startingFundMeBalance + startingOwnerBalance,
+            endingOwnerBalance
+        );
+
+    }
+```
+
+The `endingFundMeBalance` should be `0`, because we just withdrew everything from it. The `owner`'s balance should be the `startingFundMeBalance + startingOwnerBalance` because we withdrew the `fundMe` starting balance.
+
+Let's run the test using the following command: `forge test --mt testWithdrawFromASingleFunder`
+
+It passed, amazing!
+
+Remember to call `forge test` from time to time to ensure that any changes to the main contract or to testing modifiers or setup didn't break any existing tests. If it did, go back and see how the changes affected the test and modify them to accustom it.
+
+Ok, we've tested that the owner can indeed withdraw when the `fundMe` contract is funded by a single user. Can they `withdraw` when the contract is funded by multiple users?
+
+Put the following test in your `FundMe.t.sol`:
+
+```solidity
+function testWithdrawFromMultipleFunders() public funded {
+  uint160 numberOfFunders = 10;
+  uint160 startingFunderIndex = 1;
+  for (
+    uint160 i = startingFunderIndex;
+    i < numberOfFunders + startingFunderIndex;
+    i++
+  ) {
+    // we get hoax from stdcheats
+    // prank + deal
+    hoax(address(i), SEND_VALUE);
+    fundMe.fund{ value: SEND_VALUE }();
+  }
+
+  uint256 startingFundMeBalance = address(fundMe).balance;
+  uint256 startingOwnerBalance = fundMe.getOwner().balance;
+
+  vm.startPrank(fundMe.getOwner());
+  fundMe.withdraw();
+  vm.stopPrank();
+
+  assert(address(fundMe).balance == 0);
+  assert(
+    startingFundMeBalance + startingOwnerBalance == fundMe.getOwner().balance
+  );
+  assert(
+    (numberOfFunders + 1) * SEND_VALUE ==
+      fundMe.getOwner().balance - startingOwnerBalance
+  );
+}
+```
+
+That seems like a lot! Let's go through it.
+
+We start by declaring the total number of funders. Then we declare that the `startingFunderIndex` is 1. You see that both these variables are defined as `uint160` and not our usual `uint256`. Down the road, we will use the `startingFunderIndex` as an address. If we look at the definition of an [address](https://docs.soliditylang.org/en/latest/types.html#address) we see that it holds `a 20 byte value` and that `explicit conversions to and from address are allowed for uint160, integer literals, bytes20 and contract types`. Having the index already in `uint160` will save us from casting it when we need to convert it into an address.
+
+We start a `loop`. Inside this `loop` we need to `deal` and `prank` an address and then call `fundMe.fund`. Foundry has a better way: [hoax](https://book.getfoundry.sh/reference/forge-std/hoax?highlight=hoax#hoax). This works like `deal` + `prank`. It pranks the indicated address while providing some specified ether.
+
+`hoax(address(i), SEND_VALUE);`
+
+As we've talked about above, we use the `uint160` index to obtain an address. We start our index from `1` because it's not advised to user `address(0)` in this way. `address(0)` has a special regime and should not be pranked.
+
+The `SEND_VALUE` specified in `hoax` represents the ether value that will be provided to `address(i)`.
+
+Good, now that we have pranked an address and it has some balance we call `fundeMe.fund`.
+
+After the loop ends we repeat what we did in the `testWithdrawFromASingleFunder`. We record the contract and owner's starting balances. This concludes our `Arrange` stage.
+
+The next logical step is pranking the `owner` and withdrawing. This starts the `Act` stage.
+
+In the `Assert` part of our test, we compare the final situation against what we expected.
+
+`assert(address(fundMe).balance == 0);`
+
+After withdrawal, `fundMe`'s balance should be 0.
+
+`assert(startingFundMeBalance + startingOwnerBalance == fundMe.getOwner().balance);`
+
+The `owner`'s balance should be equal to the sum of `startingOwnerBalance` and the amount the `owner` withdrew (which is the `startingFundMeBalance`).
+
+`assert((numberOfFunders + 1) * SEND_VALUE == fundMe.getOwner().balance - startingOwnerBalance);`
+
+We compare the product between the total number of funders and `SEND_VALUE` to the total shift in the `owner`'s balance.
+We added `1` to the `numberOfFunders` because we used the `funded` modifier which also adds `alice` as one of the funders.
+
+Run the test using `forge test --mt testWithdrawFromMultipleFunders`. Run all tests using `forge test`.
+
+Let's run `forge coverage` and see if our coverage table got better.
+
+Congratulations, everything works way better!
