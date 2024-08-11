@@ -1,172 +1,142 @@
-# Create integration tests
+# Automate your smart contracts actions - Makefile
 
-## Writing a README.md
+## The magic of Makefile
 
-A README is often the first item a visitor will see when visiting your repository. It serves as an introduction to your project, explaining what it does, why it is useful, and how users can get started with it. This initial impression can significantly impact whether someone decides to explore your project further.
+You are a hero for getting this far! If you think a bit about your experience with the whole `FundMe` project by now, how many times have you written a `forge script NameOfScript --rpc-url xyz --private-key 0xPrivateKey ...`. There's got to be an easier way to run scripts and other commands.
 
-There are multiple templates available on the internet, but generally, yours should include at least a Title, a Project Overview, a Getting Started Guide and maybe some Contribution Guidelines (if you are building an open-source project).
+The answer for all your troubles is a `Makefile`!
 
-A README is your project's face to the world, and investing time in making it clear, comprehensive, and engaging can significantly impact your project's success and community engagement.
+A `Makefile` is a special file used in conjunction with the `make` command in Unix-based systems and some other environments. It provides instructions for automating the process of building software projects.
 
-### Integration tests
+The main advantages of using a `Makefile` are:
 
-To seamlessly interact with our contract, we need to create a programmatic for using it's functions.
+- Automates tasks related to building and deploying your smart contracts.
+- Integrates with Foundry commands like `forge build`, `forge test` and `forge script`.
+- Can manage dependencies between different smart contract files.
+- Streamlines the development workflow by reducing repetitive manual commands.
+- Allows you to automatically grab the `.env` contents.
 
-Please create a new file called `Interactions.s.sol` in the `script` folder.
+In the root folder of your project create a new file called `Makefile`.
 
-In this file, we will create two scripts, one for funding and one for withdrawing.
+After creating the file run `make` in your terminal.
 
-Each contract will contain one script, and for it to work each needs to inherit from the Script contract. Each contract will have a `run` function which shall be called by `forge script` when we run it.
+If you have `make` installed then you should receive the following message:
 
-In order to properly interact with our `fundMe` contract we would want to interact only with the most recent deployment we made. This task is easily achieved using the `foundry-devops` library. Please install it using the following command:
+`make: *** No targets.  Stop`
 
-`forge install Cyfrin/foundry-devops --no-commit`
+If you don't get this message you need to install `make`. This is a perfect time to ask your favorite AI to help, but if you still don't manage it please come on the Updraft section of Cyfrin discord and ask the lovely people there.
 
-Ok, now with that out of the way, let's work on our scripts.
+Let's start our `Makefile` with `-include .env` on the first line. This way we don't have to call `source .env` every time we want to access something from it.
 
-Put the following code in `Interactions.s.sol`:
+Soo... how do we actually write a shortcut?
 
-```solidity
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+Let's write one for `forge build`.
 
-import { Script, console } from "forge-std/Script.sol";
-import { FundMe } from "../src/FundMe.sol";
-import { DevOpsTools } from "foundry-devops/src/DevOpsTools.sol";
+In your `Makefile` write the following line:
 
-contract FundFundMe is Script {
-  uint256 SEND_VALUE = 0.1 ether;
+`build:; forge build`
 
-  function fundFundMe(address mostRecentlyDeployed) public {
-    vm.startBroadcast();
-    FundMe(payable(mostRecentlyDeployed)).fund{ value: SEND_VALUE }();
-    vm.stopBroadcast();
-    console.log("Funded FundMe with %s", SEND_VALUE);
-  }
-
-  function run() external {
-    address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment(
-      "FundMe",
-      block.chainid
-    );
-    fundFundMe(mostRecentlyDeployed);
-  }
-}
-
-contract WithdrawFundMe is Script {
-  function withdrawFundMe(address mostRecentlyDeployed) public {
-    vm.startBroadcast();
-    FundMe(payable(mostRecentlyDeployed)).withdraw();
-    vm.stopBroadcast();
-    console.log("Withdraw FundMe balance!");
-  }
-
-  function run() external {
-    address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment(
-      "FundMe",
-      block.chainid
-    );
-    withdrawFundMe(mostRecentlyDeployed);
-  }
-}
-```
-
-We've created a new function called `fundFundMe` which takes an address corresponding to the most recently deployed `FundMe` contract. Inside we start and stop a broadcast which sends a transaction calling the `fund` function from the `FundMe` contract. We've imported `console` to be able to log the amount that we funded as a confirmation. Inside the `run` function, we call `get_most_recent_deployment` from the DevOpsTools to get the address of the most recently deployed `FundMe` contract. We then use the newly acquired address as input for the `fundFundMe` function.
-
-The same thing is done for `WithdrawFundMe`.
-
-We could run this using the standard `forge script script/Interactions.s.sol:FundFundMe --rpc-url xyz --private-key etc ...` command, but writing that over and over again is not cool. We could test how this behaves using integration tests.
-
-Integration tests are crucial for verifying how your smart contract interacts with other contracts, external APIs, or decentralized oracles that provide data feeds. These tests help ensure your contract can properly receive and process data, send transactions to other contracts, and function as intended within the wider ecosystem.
-
-Before starting with the integration tests let's organize our tests into folders. Let's separate unit tests from integration tests by creating separate folders inside the `test` folder.
-
-Create two new folders called `integration` and `unit` inside the `test` folder. Move `FundMe.t.sol` inside the `unit` folder. Make sure to update `FundMe.t.sol` to accommodate this change.
-
-Run a quick `forge test` to ensure that everything builds and all tests pass.
-
-Inside the `integration` folder create a new file called `FundMeTestIntegration.t.sol`.
-
-Paste the following code inside it:
-
-```solidity
-// SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.19;
-
-import { DeployFundMe } from "../../script/DeployFundMe.s.sol";
-import { FundFundMe, WithdrawFundMe } from "../../script/Interactions.s.sol";
-import { FundMe } from "../../src/FundMe.sol";
-import { Test, console } from "forge-std/Test.sol";
-
-contract InteractionsTest is Test {
-  FundMe public fundMe;
-  DeployFundMe deployFundMe;
-
-  uint256 public constant SEND_VALUE = 0.1 ether;
-  uint256 public constant STARTING_USER_BALANCE = 10 ether;
-
-  address alice = makeAddr("alice");
-
-  function setUp() external {
-    deployFundMe = new DeployFundMe();
-    fundMe = deployFundMe.run();
-    vm.deal(alice, STARTING_USER_BALANCE);
-  }
-
-  function testUserCanFundAndOwnerWithdraw() public {
-    uint256 preUserBalance = address(alice).balance;
-    uint256 preOwnerBalance = address(fundMe.getOwner()).balance;
-
-    // Using vm.prank to simulate funding from the USER address
-    vm.prank(alice);
-    fundMe.fund{ value: SEND_VALUE }();
-
-    WithdrawFundMe withdrawFundMe = new WithdrawFundMe();
-    withdrawFundMe.withdrawFundMe(address(fundMe));
-
-    uint256 afterUserBalance = address(alice).balance;
-    uint256 afterOwnerBalance = address(fundMe.getOwner()).balance;
-
-    assert(address(fundMe).balance == 0);
-    assertEq(afterUserBalance + SEND_VALUE, preUserBalance);
-    assertEq(preOwnerBalance + SEND_VALUE, afterOwnerBalance);
-  }
-}
-```
-
-You will see that the first half, including the `setUp` is similar to what we did in `FundMe.t.sol`. The test `testUserCanFundAndOwnerWithdraw` has a similar structure to `testWithdrawFromASingleFunder` from `FundMe.t.sol`. We record the starting balances, we use `alice` to fund the contract then the `WithdrawFundMe` script to call `withdraw`. The next step is recording the ending balances and running the same assertions we did in `FundMe.t.sol`.
-
-Run the integration test using the following command:
-
-`forge test --mt testUserCanFundAndOwnerWithdraw -vv`
+Run `make build` in your terminal.
 
 ```bash
-Ran 1 test for test/integration/InteractionsTest.t.sol:InteractionsTest
-[PASS] testUserCanFundAndOwnerWithdraw() (gas: 330965)
-Logs:
-  Withdraw FundMe balance!
+make build
+forge build
+[⠔] Compiling...
 
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 7.78ms (1.01ms CPU time)
-
-
-Ran 1 test suite in 427.38ms (7.78ms CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)
+No files changed, compilation skipped
 ```
 
-Pfew! I know this was a lot. You are a true champion for reaching this point!
+And it works! We've written our first shortcut. Arguably not the best of shortcuts, we've saved 1 letter, but still, it's a start.
 
-**Note 1:** Depending on when you go through this lesson there is a small chance that `foundry-devops` library has a problem that prevents you from building. The reason this happening is `vm.keyExists` used at `foundry-devops/src/DevOpsTools.sol:119` is deprecated. Please replace `vm.keyExists` with `vm.keyExistsJson` in the place indicated. Next, we need to make sure that the `Vm.sol` contract in your forge-std library contains the `vm.keyExistsJson`. If you can't find it in your `Vm.sol` then please run the following command in your terminal: `forge update --force`. If you still can't `forge build` the project the please come ask questions in the Updraft section of Cyfrin's discord.
+**Small note**: The `:;` between `build` and `forge build` is used to indicate that the command will be given on the same line. Change the `build` shortcut as follows:
 
-**Note 2:**
+```bash
+build:
 
-Inside the video lesson, Patrick touched on the subject of `ffi`. We didn't present it at length in the body of this lesson because `foundry-devops` doesn't need it anymore. But in short:
+	forge build
+```
 
-Forge FFI, which stands for Foreign Function Interface, is a cheatcode within the Forge testing framework for Solidity. It allows you to execute arbitrary shell commands directly from your Solidity test code.
+Run it again.
 
-- FFI enables you to call external programs or scripts from within your Solidity tests.
-- You provide the command or script name along with any arguments as an array of strings.
-- The Forge testing framework then executes the command in the underlying system environment and captures the output.
+Let's write a more complex shortcut. Add the following shortcut to your `Makefile`:
 
-Read more about it [here](https://book.getfoundry.sh/cheatcodes/ffi?highlight=ffi#ffi).
+```bash
+deploy-sepolia:
 
-A word of caution: FFI bypasses the normal security checks and limitations of Solidity. By running external commands, you introduce potential security risks if not used carefully. Malicious code within the commands you execute could compromise your setup. Whenever you clone repos or download other projects please make sure they don't have `ffi = true` in their `foundry.toml` file. If they do, we advise you not to run anything before you thoroughly examine where `ffi` is used and what commands is it calling. Stay safe!
+	forge script script/DeployFundMe.s.sol:DeployFundMe --rpc-url $(SEPOLIA_RPC_URL) --private-key $(SEPOLIA_PRIVATE_KEY) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvvv
+```
+
+Now this is a mouthful. But you already know what we did above, we used `forge script` to deploy `fundMe` on Sepolia, using the private key and rpc-url we provided in the `.env`, we used `--broadcast` for the transaction to be broadcasted, and then we `verify` the contract on etherscan. The only difference compared to what we did before is encapsulating `.env` variables between round brackets. This is how Makefile knows these come from the `.env`.
+
+The `--verify` option `verifies all the contracts found in the receipts of a script, if any`. We could use the `--verifier` option to select another verifier, but we don't need that because the default option is `etherscan`. So the only thing we need is an etherscan API key. To get one go to [Etherscan.io](https://etherscan.io/register) and make an account. After that, log in, go to `OTHERS > API Keys` add a new project and copy the API Key Token.
+
+Open your `.env` file and add the following line:
+
+`ETHERSCAN_API_KEY=THEAPIKEYYOUCOPIEDFROMETHERSCANGOESHERE`
+
+Make sure your `.env` holds all the things it needs to run the shortcut above. Again, we do not use private keys associated with accounts that hold real money. Stay safe!
+
+The moment of truth:
+
+`make deploy-sepolia`
+
+```bash
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+Total Paid: 0.004665908735630779 ETH (577031 gas * avg 8.086062509 gwei)
+##
+Start verification for (1) contracts
+Start verifying contract `0x2BC3f6eB5C38532F70DD59AC6A0610453bc16e9f` deployed on sepolia
+
+Submitting verification for [src/FundMe.sol:FundMe] 0x2BC3f6eB5C38532F70DD59AC6A0610453bc16e9f.
+
+Submitting verification for [src/FundMe.sol:FundMe] 0x2BC3f6eB5C38532F70DD59AC6A0610453bc16e9f.
+
+Submitting verification for [src/FundMe.sol:FundMe] 0x2BC3f6eB5C38532F70DD59AC6A0610453bc16e9f.
+
+Submitting verification for [src/FundMe.sol:FundMe] 0x2BC3f6eB5C38532F70DD59AC6A0610453bc16e9f.
+Submitted contract for verification:
+        Response: `OK`
+        GUID: `cjgaycqnrssgths7jakwgbexwjzpa5tirhymzvhkrxitznnvzx`
+        URL: https://sepolia.etherscan.io/address/0x2bc3f6eb5c38532f70dd59ac6a0610453bc16e9f
+Contract verification status:
+Response: `NOTOK`
+Details: `Pending in queue`
+Contract verification status:
+Response: `OK`
+Details: `Pass - Verified`
+Contract successfully verified
+
+All (1) contracts were verified!
+```
+
+The contract is deployed on Sepolia and we verified it on [Etherscan](https://sepolia.etherscan.io/address/0x2bc3f6eb5c38532f70dd59ac6a0610453bc16e9f).
+
+Amazing work!
+
+This is just an introductory lesson on how to write Makefiles. Properly organizing your scripts and then transforming them into shortcuts that save you from typing 3 lines of code in the terminal is an ART!
+
+Let's pass through some examples. Go copy the [Makefile available in the Fund Me repo](https://github.com/Cyfrin/foundry-fund-me-f23/blob/main/Makefile).
+
+Treat this `Makefile` as a framework for your projects.
+
+Open the file and go through it.
+
+The `.PHONY:` tells make that all the `all test clean deploy fund help install snapshot format anvil` are not folders. Following that we declare the `DEFAULT_ANIVL_KEY` and a custom help message.
+
+Run make help to print it in your terminal.
+
+There are a lot of useful shortcuts related to dependencies, formatting, deployment etc.
+
+For example, run the following commands:
+
+`make anvil`
+
+Open a new terminal.
+
+`make deploy`
+
+And you just deployed a fresh `FundMe` contract on a fresh `anvil` blockchain. Super fast and super cool!
+
+We could do the same for Sepolia by running `make deploy ARGS="--network sepolia"`.
+
+Makefile is amazing!
