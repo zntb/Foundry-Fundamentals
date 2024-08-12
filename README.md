@@ -1,57 +1,172 @@
-# How Metamask interacts with dapps
+# Introduction to window.ethereum
 
-## In this lesson, we are going to learn:
+## Browser Wallets
 
-1. How to quickly clone a repo in our terminal.
-2. Use Live Server in VS Code to see our changes 'live' as we code.
+The first concept we need to grasp when working with a website in Web3 is that of a browser wallet - in our case Metamask. It's through a wallet like Metamask that we are able to interact with the blockchain and the Web3 ecosystem.
 
-### Key Concepts
+We can gain more insight into how this works by right-clicking our `FundMe` website and selecting `inspect`. You can also open this panel by pressing F12.
 
-1. `git clone` - command used to make a copy of a repository on your local machine.
-2. `live server` - a VS Code extension that opens in your browser and automatically updates with your code.
+Navigate to the console tab of this panel. This tab contains a live JavaScript shell which houses a tonne of information about the browser we have open. Among this data is a JavaScript object, `window`.
 
-### Overview
+By typing `window` and hitting enter the console will display this object and all of the functions it contains.
 
-Let's look at how what we've built interacts with a wallet. Remember, you can find all the code for this lesson **[here](https://github.com/Cyfrin/html-fund-me-f23)**.
+We should see something like this:
 
-We won't be going over a whole full-stack application here, but the repo above contains a raw front-end you can try to replicate if you would like to challenge yourself.
+As seen in the image, there are some properties of this object which are not there by default, one of which is `window.ethereum`. It's through this property that a front end is able to interact with our wallet and it's accounts.
 
-> Additional front-end content will be available on Updraft in the near future!
+> Try inspecting a browser without a browser wallet installed. You'll see that `window.ethereum` doesn't exist!
 
-Our focus will be on uncovering what's happening 'under the hood', allowing you to understand exactly what's going on when you interact with a website sending a transaction to the blockchain.
+I recommend reading the **[Metamask documentation](https://docs.metamask.io/guide/)** on the window\.ethereum object to learn more.
 
-### Setup
+### The Code
 
-Normally I would walk you through the steps to get setup, but I'm not going to do that this time.
+Alright, great. How does the code which interacts with all this look like? We can take a look at the `index.js` file in our html-fund-me repo for this.
 
-Now that you've installed Git and created a GitHub in previous lessons, we're going to clone an existing repo to have something to start with rather than starting from scratch.
+One of the first things you'll see is a `connect` function. This is pretty ubiquitous and is how most Web3 websites are told _Hey, I have a browser wallet, here are the accounts I want to use._
 
-**Step 1:** In our terminal use the command:
-
-```bash
-git clone https://github.com/Cyfrin/html-fund-me-f23.git
+```js
+async function connect() {
+  if (typeof window.ethereum !== "undefined") {
+    try {
+      await ethereum.request({ method: "eth_requestAccounts" });
+    } catch (error) {
+      console.log(error);
+    }
+    connectButton.innerHTML = "Connected";
+    const accounts = await ethereum.request({ method: "eth_accounts" });
+    console.log(accounts);
+  } else {
+    connectButton.innerHTML = "Please install MetaMask";
+  }
+}
 ```
 
-**Step 2:** Now we can open this in a new instance of VS Code with:
+We see the first thing that this function does is checks for our `window.ethereum` object then connects and requests accounts.
 
-```bash
-code html-fund-me-f23
+> **Note:** This request for accounts does **not** provide access to your private key. It allows the website to send transaction requests to your wallet in order for you to sign.
+
+Let's look briefly at the HTML and how it calls this function.
+
+```html
+<body>
+  <button id="connectButton">Connect</button>
+  ...
+</body>
 ```
 
-In order to spin up a local front end, we're going to use an extension called **[Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer)**. Once installed you can simply press the `Go Live` button in the bottom right.
+The body of our `index.html` contains this button (among others) with the `id` `connectButton`.
 
-Once installed, you can simply press the 'Go Live' button in the bottom right of your VS Code.
+Switching to our `index.js` we see this:
 
-And with that you should have this simple front end open in a browser.
+```js
+const connectButton = document.getElementById("connectButton")
+...
+connectButton.onclick = connect
+```
 
-We'll be using this to glean a deeper understanding of what exactly is happening when we're interacting with websites in the coming lessons.
+This grabs the element of the webpage by the `id` we set and then uses the `onClick` method to call our `connect` function!
 
-### Questions to Consider
+### Connecting in Action
 
-Use the following to check your comprehension of the lesson.
+Clicking on the `Connect` button on our `html-fund-me` front end, should trigger our Metamask to pop up. From there we can select an account and click connect.
 
-1. How can I clone an existing repo on my local device?
-2. How can I view changes to my front end code as I develop them?
-3. How can these tools help me as a developer/auditor?
+You'll know this works if your `Connect` button changes to `Connected` and an address is printed to your browser console.
 
-Happy learning! 🚀👩‍💻
+Now you're ready to interact! The functions on our front-end example should look familiar. They're the same as the FundMe backend we built in the previous section.
+
+Let's try calling `getBalance` and see how it works - if you're chain is currently set to Ethereum, you might actually get a balance.
+
+When the `getBalance` buttons is clicked, this is the function we're calling on our front-end.
+
+```js
+async function getBalance() {
+  if (typeof window.ethereum !== "undefined") {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    try {
+      const balance = await provider.getBalance(contractAddress);
+      console.log(ethers.formatEther(balance));
+    } catch (error) {
+      console.log(error);
+    }
+  } else {
+    balanceButton.innerHTML = "Please install MetaMask";
+  }
+}
+```
+
+As before, we're checking for the existence of `window.ethereum` and then .. defining a provider.
+
+### RPC URLs and Providers
+
+`ethers` is a javascript package that simplifies the use and interacation of browser wallets with our code.
+
+What `ethers.BrowserProvider(window.ethereum)` is doing, is deriving the providers Metamask is injecting into our `window.ethereum` object. The providers are the RPC URLs associated with the networks in our Metamask account.
+
+When we call functions on our front-end. We're effectively making API calls via the RPC URL to the blockchain.
+
+### Trying it Out
+
+In order to get some experience trying this ourselves, we'll need to set up the backend of our project and import our anvil account into Metamask.
+
+Open your foundry-fund-me directory in VS Code and in your terminal run `anvil`.
+
+This should spin up a local test chain for you. Copy one of the mock private keys it provides you in the terminal, we'll need this to import the account into our Metamask wallet.
+
+With this chain running, open a second terminal and run the command `make deploy`.
+
+This will compile and deploy our FundMe project onto our locally running blockchain. Assuming you've not run into errors. That's all that's required to set up the back end.
+
+Return to Metamask, and within your network selector choose `Add Network`.
+
+Select `Add a network manually` linked at the bottom of the served page.
+
+In the subsequent page, inter your local network information as follows and click `Save`.
+
+Next, we need to add one of our `anvil` accounts to the wallet!
+
+Click the account displayed at the top of your Metamask and select `Add an account or hardware wallet` from the bottom of the list.
+
+You'll be prompted to `add a new account`, `import an account`, or `add a hardware wallet`. Select `import an account` and enter your previously copied mock private key into the field provided.
+
+ALRIGHT. With all the set up done, we should be able to select our `anvil` chain in Metamask, then select the account we just added and click the `connect` button.
+
+If we click `getBalance` we should have `0` returned in our console reflecting the balance of our deployed contract. At this point, we should be able to enter an amount and click `fund`.
+
+Our Metamask pops up and has us sign the transaction, funding the contract with the amount we've entered!
+
+```js
+async function fund() {
+  const ethAmount = document.getElementById("ethAmount").value;
+  console.log(`Funding with ${ethAmount}...`);
+  if (typeof window.ethereum !== "undefined") {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = provider.getSigner();
+    const contract = new ethers.Contract(contractAddress, abi, signer);
+    try {
+      const transactionResponse = await contract.fund({
+        value: ethers.parseEther(ethAmount),
+      });
+      await listenForTransactionMine(transactionResponse, provider);
+    } catch (error) {
+      console.log(error);
+    }
+  } else {
+    fundButton.innerHTML = "Please install MetaMask";
+  }
+}
+```
+
+The function being called when we click this button is very similar in structure to the other we looked at.
+
+- look for `window.ethereum`
+- define our `provider`
+- acquire the `signer` (account credentials)
+- define the contract/target of our call
+  - these are hardcoded for simplification purposes in this example and can be found in the **[constants.js](https://github.com/Cyfrin/html-fund-me-f23/blob/main/constants.js)** file of our **[html-fund-me repo](https://github.com/Cyfrin/html-fund-me-f23)**.
+- submit transaction to the target contract with provided arguments.
+
+> **Note:** I'll stress again that this call being made by the front-end does **not** give the front-end access to private key data. The transaction is always sent to the wallet for confirmation/signing.
+
+### Wrap Up
+
+We've learnt a lot about how browser wallets like Metamask work under the hood and actually send our transactions to the blockchain. Great work - we've more low level concepts to cover in our next lesson.
