@@ -1,65 +1,23 @@
-# Decoding Ethereum transactions
+# Section recap
 
-## Intro to Function Selectors
+We learnt, in order to send a transaction, you need to connect your wallet.
 
-Continuing from the last lesson, when we call the `fund` function our Metamask is going to pop up with a bunch of information about the transaction.
+The most popular way to connect our wallet to Web3 enabled applications is through browser injection. Our browser can check for the presence of a wallet by checking for the `window.ethereum` object.
 
-By clicking the `Hex` tab, we can confirm the raw data for this transaction and exactly which function is being called.
+Additionally, in order to send a transaction to our wallet, our browser needs an RPC URL or a `provider` this is derived from the `ethereum.window` object that our browser wallet creates.
 
-We'll go into `function selectors` a lot more later, but the important thing to understand is that when a Solidity contract is compiled, our functions are converted into a low-level bytecode called a `function selector`.
-
-When we call our `fund` function, this is converted to a `function selector` that we can actually verify using Foundry's `cast` command.
-
-```bash
-cast sig "fund()"
+```js
+const provider = new ethers.providers.Web3Provider(window.ethereum);
 ```
 
-The above should result in the output `0xb60d4288` and when we compare this to the `Hex` data in our Metamask, we see that it does indeed match!
+Our wallet also provides the browser with an account to use through this line.
 
-Were the function being called something secret/nefarious like `stealMoney()`. This function selector would be completely different. Running our cast command again confirms this clearly with a return of `0xa7ea5e4e`.
-
-We can use this knowledge to verify any function we're calling through our browser wallet by comparing the expected and actual `function selectors` for the transaction.
-
-There's even a way to decode calldata using the cast command.
-
-Let's say our function was a little different and it required an argument.
-
-```solidity
-function fund(uint256 amount) public payable {
-  require(
-    amount.getConversionRate(s_priceFeed) >= MINIMUM_USD,
-    "You need to spend more ETH!"
-  );
-  // require(PriceConverter.getConversionRate(msg.value) >= MINIMUM_USD, "You need to spend more ETH!");
-  s_addressToAmountFunded[msg.sender] += amount;
-  s_funders.push(msg.sender);
-}
+```js
+const signer = provider.getSigner();
 ```
 
-If we were to call this function, the information Metamask gives us is a little different.
+Once a wallet is connected, it's important to remember that the browser sends transactions _to_ our wallet for signing/confirmation. The wallet does _not_ provide private key information to the browser application.
 
-In this instance, we can use the command `cast --calldata-decode <SIG> <CALLDATA>` to provide us the parameters being passed in this function call!
+We also learnt a basic way to verify the function calls being sent to our wallet through the use of `function selectors` and decoding `calldata`. We'll go over this in more detail later!
 
-```bash
-cast --calldata-decode "fund(uint256)" 0xca1d209d000000000000000000000000000000000000000000000000016345785d8a0000
-```
-
-The above decodes to:
-
-```solidity
-100000000000000000 [1e17]
-```
-
-0.1 Eth! The same amount being passed as an argument to our `fund` call. It seems this function is safe!
-
-### Wrap Up
-
-This more or less summarizes how transactions work through our browser wallet and what we can expect to see from a low-level with respect to the encoded `function selectors` and `calldata`, we'll go over those in more detail later.
-
-I encourage you to experiment with the remaining functions on the front end. A few things to try:
-
-- Funding and Withdrawing with an account
-- Funding with Account A and Withdrawing with Account B - what happens?
-- Verify the `function selectors` of our other functions
-
-In our next lesson we'll recap everything we've learnt so far 💪
+That's all there is to this lesson! With your deeper understanding of how transactions are handled, I'll see you in the next one!
