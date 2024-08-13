@@ -1,65 +1,80 @@
-# Creating custom errors
+# Smart contracts events
 
-## Implementing the `entranceFee`
+## Tracking participants
 
-Great! Let's move on with writing the contract.
+Ok, our user paid the entrance fee, but how do we track his registration? We can't simply take the money and run! We need a storage structure that keeps track of all registered users from where to pick the winner.
 
-Previously we defined the `i_entranceFee` variable. This is the amount the user has to send to enter the raffle. How do we check this?
+Take a moment and decide what would be the best from the following:
 
-```solidity
-function enterRaffle() external payable {
-  require(msg.value >= i_entranceFee, "Not enough ETH sent");
-}
-```
+1. Mapping;
+2. Array;
+3. A bunch of address variables and limit the number of participants;
 
-First, we changed the visibility from public to `external`. `External` is more gas efficient, and we won't call the enterRaffle function internally.
+.
+.
+.
 
-We used a require statement to ensure that the `msg.value` is higher than `i_entranceFee`. If that is false we will yield an error message `"Not enough ETH sent"`.
+Congratulations if you chose the **Array** option! To be more specific, a dynamic array that grows in size with each new participant. Mappings can't be looped through, and a bunch of address variables is not feasible.
 
-**Note:** The `require` statement is used to enforce certain conditions at runtime. If the condition specified in the `require` statement evaluates to `false`, the transaction is reverted, and any changes made to the state within that transaction are undone. This is useful for ensuring that certain prerequisites or validations are met before executing further logic in a smart contract.
+Add the array below the `i_entranceFee` declaration: `address payable[] private s_players;`
 
-In Solidity 0.8.4 a new and more gas-efficient way has been introduced.
+We've made it `address payable` because one of the participants registered in this array will be paid the ETH prize, hence the need for the `payable` attribute.
 
-## Custom errors
-
-[Custom errors](https://docs.soliditylang.org/en/v0.8.25/contracts.html#errors-and-the-revert-statement) provide a way to define and use specific error types that can be used to revert transactions with more efficient and gas-saving mechanisms compared to the `require` statements with string messages. If you want to find out more about how custom errors decrease both deploy and runtime gas click [here](https://soliditylang.org/blog/2021/04/21/custom-errors/).
-
-I know we just wrote this using the `require` statement, we did that because `require` is used in a lot of projects, that you might get inspiration from or build on top of and so on. But from now on we will perform checks using the `if` statement combined with custom errors.
-
-We will refactor `enterRaffle`, but before that let's define our custom error. Be mindful of the layout we talked about in the previous lesson
-
-```solidity
-error Raffle_NotEnoughEthSent();
-```
-
-Now the `enterRaffle()` function:
+Back in the `enterRaffle` function, we need to add the address that paid into the `s_players` array:
 
 ```solidity
 function enterRaffle() external payable {
-  // require(msg.value >= i_entranceFee, "Not enough ETH sent!");
   if (msg.value < i_entranceFee) revert Raffle__NotEnoughEthSent();
+  s_players.push(payable(msg.sender));
 }
 ```
 
-You will see that we named the custom error using the `Raffle__` prefix. This is a very good practice that will save you a ton of time when you need to debug a protocol with 20 smart contracts. You will run your tests and then ask yourself `Ok, it failed with this error ... but where does this come from?`. Because you thought ahead and used prefixes in naming your error you won't have that problem! Awesome!
+The `.push` method is used to append an element to an array, increasing its length by 1.
 
-**Note:**
+`s_players.push(payable(msg.sender));` performs a modification of the state by adding the payable address `msg.sender` in the array. It is customary to emit an **event** every time we perform a state modification.
 
-In Solidity, like in many other programming languages, you can write if statements in a single line for brevity, especially when they are simple and only execute a single statement. This is purely a stylistic choice and does not affect the functionality or performance of the code.
+### Events
 
-There is no difference between this:
+Events are a way for smart contracts to communicate with the outside world, primarily with the front-end applications that interact with these contracts. Events are logs that the Ethereum Virtual Machine (EVM) stores in a special data structure known as the blockchain log. These logs can be efficiently accessed and filtered by external applications, such as dApps (decentralized applications) or off-chain services. The logs can also be accessed from the blockchain nodes. Each emitted event is tied up to the smart contract that emitted it.
+
+Please click [here](https://docs.soliditylang.org/en/v0.8.25/contracts.html#events) to find out more about events.
+
+How can we use events?
+
+Imagine we have a more complex function that changes an important parameter, let's say we are recording the exchange rate of BTC/USDC. We change it by calling the function `changeER()`. After we perform the call and the exchange rate is changed we need to make sure this also gets picked up by our front-end. We make the front-end listen for the `BTCUSDCupdated` event. An example of that event could be this:
 
 ```solidity
-if(msg.value < i_entranceFee) revert Raffle__NotEnoughEthSent();
+event BTCUSDCupdated(
+    uint256 indexed oldER,
+    uint256 indexed newER,
+    uint256 timestamp,
+    address sender
+
+)
 ```
 
-and this:
+You will see that some of the emitted parameters are indexed and some are not. Indexed parameters, also called `topics`, are much more easy to search than non-indexed ones.
+
+For an event to be logged we need to emit it.
+
+Let's come back to our `Raffle` contract where we'll also learn how to emit them.
+
+First, we define the event (be mindful of where the events should go in terms of our defined layout)
 
 ```solidity
-if(msg.value < i_entranceFee) {
-    revert Raffle__NotEnoughEthSent();
+event EnteredRaffle(address indexed player);
+```
 
+Then, we emit it in `enterRaffle`:
+
+```solidity
+function enterRaffle() external payable {
+  if (msg.value < i_entranceFee) revert Raffle__NotEnoughEthSent();
+  s_players.push(payable(msg.sender));
+  emit EnteredRaffle(msg.sender);
 }
 ```
 
-Amazing work! Let's learn about events!
+Great! I know there is a possibility you don't quite understand the importance/usage of this event, but don't worry, we'll get back to it in the testing section.
+
+But before that, let's discuss randomness.
