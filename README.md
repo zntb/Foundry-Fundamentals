@@ -1,80 +1,73 @@
-# Smart contracts events
+# Random numbers - Block Timestamp
 
-## Tracking participants
+## Prerequisites for picking a winner
 
-Ok, our user paid the entrance fee, but how do we track his registration? We can't simply take the money and run! We need a storage structure that keeps track of all registered users from where to pick the winner.
+Going back to [lesson 1](https://updraft.cyfrin.io/courses/foundry/smart-contract-lottery/setup), we established that one of the Raffle contract goals is `...we should be able to automatically pick a winner out of the registered users.`
 
-Take a moment and decide what would be the best from the following:
+What do we need to do that?
 
-1. Mapping;
-2. Array;
-3. A bunch of address variables and limit the number of participants;
+1. A random number;
+2. Use the random number to pick a winning player;
+3. Call `pickWinner` automatically;
 
-.
-.
-.
-
-Congratulations if you chose the **Array** option! To be more specific, a dynamic array that grows in size with each new participant. Mappings can't be looped through, and a bunch of address variables is not feasible.
-
-Add the array below the `i_entranceFee` declaration: `address payable[] private s_players;`
-
-We've made it `address payable` because one of the participants registered in this array will be paid the ETH prize, hence the need for the `payable` attribute.
-
-Back in the `enterRaffle` function, we need to add the address that paid into the `s_players` array:
+For now, let's focus on points 1 and 2. But before diving straight into the randomness let's think a bit about the Raffle design. We don't have any problem with anyone calling `pickWinner`. As long as someone wants to pay the gas associated with that they are more than welcome to do it. But we need to make sure that a decent amount of time passed since the start of the raffle. We don't want to host a 10-second raffle where two people get to register and then someone calls the `pickWinner`. In that sense, we need to define a new state variable called `i_interval` which represents the duration of a raffle:
 
 ```solidity
-function enterRaffle() external payable {
-  if (msg.value < i_entranceFee) revert Raffle__NotEnoughEthSent();
-  s_players.push(payable(msg.sender));
+contract Raffle{
+
+    error Raffle__NotEnoughEthSent();
+
+    uint256 private immutable i_entranceFee;
+    // @dev Duration of the lottery in seconds
+    uint256 private immutable i_interval;
+    address payable[] private s_players;
+
+    event EnteredRaffle(address indexed player);
+
+    constructor(uint256 entranceFee, uint256 interval) {
+        i_entranceFee = entranceFee;
+        i_interval = interval;
+
+    }
+```
+
+Now that we have defined a raffle duration, we need to check it in `pickWinner`, but check it against what? We need to check it against the difference between the moment in time when the raffle started and the moment in time when the function `pickWinner` is called. But for that, we need to record the raffle starting time.
+
+Perform the following update:
+
+```solidity
+contract Raffle{
+
+    error Raffle__NotEnoughEthSent();
+
+    uint256 private immutable i_entranceFee;
+    // @dev Duration of the lottery in seconds
+    uint256 private immutable i_interval;
+    address payable[] private s_players;
+    uint256 private s_lastTimeStamp;
+
+    event EnteredRaffle(address indexed player);
+
+    constructor(uint256 entranceFee, uint256 interval) {
+        i_entranceFee = entranceFee;
+        i_interval = interval;
+        s_lastTimeStamp = block.timestmap;
+
+    }
+
+    function pickWinner() external {
+```
+
+And now we have all the prerequisites to perform the check:
+
+```solidity
+// 1. Get a random number
+// 2. Use the random number to pick a player
+// 3. Automatically called
+function pickWinner() external {
+  // check to see if enough time has passed
+  if (block.timestamp - s_lastTimeStamp < interval) revert();
 }
 ```
 
-The `.push` method is used to append an element to an array, increasing its length by 1.
-
-`s_players.push(payable(msg.sender));` performs a modification of the state by adding the payable address `msg.sender` in the array. It is customary to emit an **event** every time we perform a state modification.
-
-### Events
-
-Events are a way for smart contracts to communicate with the outside world, primarily with the front-end applications that interact with these contracts. Events are logs that the Ethereum Virtual Machine (EVM) stores in a special data structure known as the blockchain log. These logs can be efficiently accessed and filtered by external applications, such as dApps (decentralized applications) or off-chain services. The logs can also be accessed from the blockchain nodes. Each emitted event is tied up to the smart contract that emitted it.
-
-Please click [here](https://docs.soliditylang.org/en/v0.8.25/contracts.html#events) to find out more about events.
-
-How can we use events?
-
-Imagine we have a more complex function that changes an important parameter, let's say we are recording the exchange rate of BTC/USDC. We change it by calling the function `changeER()`. After we perform the call and the exchange rate is changed we need to make sure this also gets picked up by our front-end. We make the front-end listen for the `BTCUSDCupdated` event. An example of that event could be this:
-
-```solidity
-event BTCUSDCupdated(
-    uint256 indexed oldER,
-    uint256 indexed newER,
-    uint256 timestamp,
-    address sender
-
-)
-```
-
-You will see that some of the emitted parameters are indexed and some are not. Indexed parameters, also called `topics`, are much more easy to search than non-indexed ones.
-
-For an event to be logged we need to emit it.
-
-Let's come back to our `Raffle` contract where we'll also learn how to emit them.
-
-First, we define the event (be mindful of where the events should go in terms of our defined layout)
-
-```solidity
-event EnteredRaffle(address indexed player);
-```
-
-Then, we emit it in `enterRaffle`:
-
-```solidity
-function enterRaffle() external payable {
-  if (msg.value < i_entranceFee) revert Raffle__NotEnoughEthSent();
-  s_players.push(payable(msg.sender));
-  emit EnteredRaffle(msg.sender);
-}
-```
-
-Great! I know there is a possibility you don't quite understand the importance/usage of this event, but don't worry, we'll get back to it in the testing section.
-
-But before that, let's discuss randomness.
+Don't worry! We will create a custom error for that in the next lesson. But before that let's talk randomness.
