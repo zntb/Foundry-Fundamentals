@@ -1,23 +1,28 @@
-# Section recap
+# Section 4 - Smart Contract Lottery
 
-We learnt, in order to send a transaction, you need to connect your wallet.
+## Introduction
 
-The most popular way to connect our wallet to Web3 enabled applications is through browser injection. Our browser can check for the presence of a wallet by checking for the `window.ethereum` object.
+Welcome to Section 9 of this course! You can code along by following the [GitHub repo](https://github.com/Cyfrin/foundry-smart-contract-lottery-cu) associated with this section. This project will be a valuable addition to your portfolio, as we'll develop a **Verifiably Random Lottery Smart Contract** that contains a lot of best coding practices.
 
-Additionally, in order to send a transaction to our wallet, our browser needs an RPC URL or a `provider` this is derived from the `ethereum.window` object that our browser wallet creates.
+> 🗒️ **NOTE**
+> We won't be deploying this to ZkSync because of current integration constraints.
 
-```js
-const provider = new ethers.providers.Web3Provider(window.ethereum);
+In this lesson, we will cover **events**, **true random numbers**, **modules**, and **automation**. You can preview the final project by cloning the repository and checking the `makefile`, which lists all the specific versions of dependencies needed to compile our contract.
+
+The main contract that we'll work on will be `src/Raffle.sol`. It contains detailed comments and professional-looking NAT spec, such as:
+
+```solidity
+/**
+ * @title A sample Raffle Contract
+ * @notice This contract is for creating a sample raffle contract
+ * @dev This implements the Chainlink VRF Version 2
+ */
 ```
 
-Our wallet also provides the browser with an account to use through this line.
+This smart contract allows for a **fully automated** Smart Contract Lottery where users can buy a lottery ticket by entering a raffle. Functions like `checkUpkeep` and `performUpkeep` will automate the lottery process, ensuring the system runs without manual intervention.
 
-```js
-const signer = provider.getSigner();
-```
+We'll use **Chainlink VRF** version 2.5 for randomness. The `fulfillRandomWords` function will handle the selection of the random winner and reset the lottery, ensuring a provably fair system.
 
-Once a wallet is connected, it's important to remember that the browser sends transactions _to_ our wallet for signing/confirmation. The wallet does _not_ provide private key information to the browser application.
+We'll also write advanced **scripts** that you can find inside the `makefile`. These include various commands to interact with the smart contract, such as creating subscriptions and adding a consumer.
 
-We also learnt a basic way to verify the function calls being sent to our wallet through the use of `function selectors` and decoding `calldata`. We'll go over this in more detail later!
-
-That's all there is to this lesson! With your deeper understanding of how transactions are handled, I'll see you in the next one!
+Let's dive in and start building this exciting project!
