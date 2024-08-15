@@ -1,113 +1,249 @@
-# Random numbers - Introduction to Chainlink VRF
+# Implement the Chainlink VRF
 
-## Introduction to Chainlink VRF
+## Getting Started with Chainlink VRF
 
-Chainlink VRF (Verifiable Random Function) is a service provided by the Chainlink network that offers secure and verifiable randomness to smart contracts on blockchain platforms. This randomness is crucial for our Raffle and for any other applications that need a source of randomness.
+Continuing the previous lesson, let's integrate Chainlink VRF into our Raffle project.
 
-How does Chainlink VRF work?
-
-Chainlink VRF provides randomness in 3 steps:
-
-1. Requesting Randomness: A smart contract makes a request for randomness by calling the `requestRandomness` function provided by the Chainlink VRF. This involves sending a request to the Chainlink oracle along with the necessary fees.
-
-2. Generating Randomness: The Chainlink oracle node generates a random number off-chain using a secure cryptographic method. The oracle also generates a proof that this number was generated in a verifiable manner.
-
-3. Returning the Result: The oracle returns the random number along with the cryptographic proof to the smart contract. The smart contract can then use the random number, and any external observer can verify the proof to confirm the authenticity and integrity of the randomness.
-
-Let's dive deeper. We will follow the Chainlink tutorial available [here](https://docs.chain.link/vrf/v2/subscription/examples/get-a-random-number).
-
-Go to the [Chainlink Faucet](https://faucets.chain.link/sepolia) and grab yourself some test LINK and/or ETH. Make sure you connect your test account using the appropriate Sepolia Chain.
-
-Go [here](https://docs.chain.link/vrf/v2/subscription/examples/get-a-random-number) and scroll down and press on the blue button that says `Open the Subscription Manager`.
-
-Press on the blue button that says `Create Subscription`. You don't need to provide a project name or an email address, but you can if you want to.
-
-When you press `Create subscription` you will need to approve the subscription creation. Sign it using your Metamask and wait until you receive the confirmation. You will be asked to sign the message again. If you are not taken to the `Add Funds` page, go to `My Subscriptions` section and click on the id of the subscription you just created, then click on `Actions` and `Fund subscription`. Proceed in funding your subscription.
-
-The next step is adding consumers. On the same page, we clicked on the `Actions` button you can find a button called `Add consumer`. You will be prompted with an `Important` message that communicates your `Subscription ID`. That is a very important thing that we'll use in our smart contract.
-
-Keep in mind that our smart contract and Chainlink VRF need to be aware of each other, which means that Chainlink needs to know the address that will consume the LINK we provided in our subscription and the smart contract needs to know the Subscription ID.
-
-Go back to the [tutorial page](https://docs.chain.link/vrf/v2/subscription/examples/get-a-random-number#create-and-deploy-a-vrf-v2-compatible-contract). Scroll down to the `Create and deploy a VRF v2 compatible contract` section. Read the short description about dependencies and pre-configured values and open the contract in Remix by pressing on `Open in Remix`.
+Coming back to our `pickWinner` function.
 
 ```solidity
-For this example, use the VRFv2Consumer.sol sample contract. This contract imports the following dependencies:
-
-- VRFConsumerBaseV2.sol
-- VRFCoordinatorV2Interface.sol
-- ConfirmedOwner.sol
-
-The contract also includes pre-configured values for the necessary request parameters such as vrfCoordinator address, gas lane keyHash, callbackGasLimit, requestConfirmations and number of random words numWords. You can change these parameters if you want to experiment on different testnets, but for this example you only need to specify subscriptionId when you deploy the contract.
-
-
-Build and deploy the contract on Sepolia.
+// 1. Get a random number
+// 2. Use the random number to pick a player
+// 3. Automatically called
+function pickWinner() external {
+  // check to see if enough time has passed
+  if (block.timestamp - s_lastTimeStamp < i_interval) revert();
+}
 ```
 
-Ignoring the configuration parameters for now let's look through the most important elements of the contract:
+Let's focus on points 1 and 2. In the previous lesson, we learned that we need to request a `randomWord` and Chainlink needs to callback one of our functions to answer the request. Let's copy the `requestId` line from the [Chainlink VRF docs](https://docs.chain.link/vrf/v2/subscription/examples/get-a-random-number#analyzing-the-contract) example inside our `pickWinner` function and start fixing the missing dependencies.
 
 ```solidity
-    struct RequestStatus {
-        bool fulfilled; // whether the request has been successfully fulfilled
-        bool exists; // whether a requestId exists
-        uint256[] randomWords;
-    }
-    mapping(uint256 => RequestStatus)
-        public s_requests; /* requestId --> requestStatus */
+function pickWinner() external {
+  // check to see if enough time has passed
+  if (block.timestamp - s_lastTimeStamp < i_interval) revert();
 
-    uint256[] public requestIds;
-
-    uint256 public lastRequestId;
-```
-
-This is the way the contract keeps track of the requests, their status and the `randomWords` provided as a response to the requests. The mapping uses the `requestId` as a key and the details regarding the request are stored inside the `RequestStatus` struct which acts as a mapping value. Given that we can't loop through mappings we will also have a `requestIds` array. We also record the `lastRequestId` for efficiency.
-
-We will also store the `subscriptionId` as a state variable, this will be checked inside the `requestRandomWords` by the `VRFCoordinatorV2`. If we don't have a valid subscription or we don't have enough funds our request will revert.
-
-The next important piece is the `VRFCoordinatorV2Interface` which is one of the dependencies we import, this [contract](https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol) has a lot of methods related to subscription management and requests, but the one we are interested in right now is `requestRandomWords`, this is the function that we need to call to trigger the process of receiving the random words, that we'll use as a source of randomness in our application.
-
-```solidity
-// Assumes the subscription is funded sufficiently.
-function requestRandomWords() external onlyOwner returns (uint256 requestId) {
-  // Will revert if subscription is not set and funded.
-  requestId = COORDINATOR.requestRandomWords(
+  uint256 requestId = COORDINATOR.requestRandomWords(
     keyHash,
     s_subscriptionId,
     requestConfirmations,
     callbackGasLimit,
     numWords
   );
-  s_requests[requestId] = RequestStatus({
-    randomWords: new uint256[](0),
-    exists: true,
-    fulfilled: false
-  });
-  requestIds.push(requestId);
-  lastRequestId = requestId;
-  emit RequestSent(requestId, numWords);
-  return requestId;
 }
 ```
 
-This function is the place where we call the `requestRandomWords` on the `VRFCoordinatorV2Interface` which sends us back the `requestId`. We record this `requestId` in the mapping, creating its `RequestStatus`, we push it into the `requestIds` array and update the `lastRequestId` variable. The function returns the `requestId`.
+You know the `keyHash`, `subId`, `requestConfirmations`, `callbackGasLimit` and `numWords` from our previous lesson.
 
-After calling the function above, Chainlink will call your `fulfillRandomWords` function. They will provide the `_requestId` corresponding to your `requestRandomWords` call together with the `_randomWrods`. It updates the `fulfilled` and `randomWords` struct parameters. In real-world applications, this is where the logic happens. If you have to assign some traits to an NFT, roll a dice, draw the raffle winner, etc.
+Ok, starting from the beginning what do we need?
 
-Great! Let's come back to the configuration parameters. The `keyHash` variable represents the gas lane we want to use. Think of those as the maximum gas price you are willing to pay for a request in WEI. It functions as an ID of the off-chain VRF job that runs in response to requests.
+1. We need to establish the fact that our `Raffle` contract is a consumer of Chainlink VRF;
+
+2. We need to take care of the VRF Coordinator, define it as an immutable variable and give it a value in the constructor;
+
+Let's add the following imports:
 
 ```solidity
-200 gwei Key Hash   0x8af398995b04c28e9951adb9721ef74c74f93e6a478f39e7e0777be13527e7ef
-500 gwei Key Hash   0xff8dedfbfa60af186cf3c830acbc32c05aae823045ae5ea7da1e45fbfaba4f92
+import { VRFCoordinatorV2Interface } from "chainlink/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
 
-1000 gwei Key Hash  0x9fe0eebf5e446e3c998ec9bb19951541aee00bb90ea201ae456421a2ded86805
+import { VRFConsumerBaseV2 } from "chainlink/src/v0.8/vrf/VRFConsumerBaseV2.sol";
 ```
 
-These are the gas lanes available on Ethereum mainnet, you can find out info about all available gas lanes on [this page](https://docs.chain.link/vrf/v2/subscription/supported-networks).
+Let's make our contract inherit the `VRFConsumerBaseV2`:
 
-The same page contains information about `Max Gas Limit` and `Minimum Confirmations`. Our contract specifies those in `callbackGasLimit` and `requestConfirmations`.
+```solidity
+contract Raffle is VRFConsumerBaseV2
+```
 
-- `callbackGasLimit` needs to be adjusted depending on the number of random words you request and the logic you are employing in the callback function.
-- `requestConfirmations` specifies the number of block confirmations required before the Chainlink VRF node responds to a randomness request. This parameter plays a crucial role in ensuring the security and reliability of the randomness provided. A higher number of block confirmations reduces the risk of chain reorganizations affecting the randomness request. Chain reorganizations (or reorgs) occur when the blockchain reorganizes due to the discovery of a longer chain, which can potentially alter the order of transactions.
+Add a new immutable variable:
 
-Another extremely important aspect related to Chainlink VRF is understanding its `Security Considerations`. Please read them [here](https://docs.chain.link/vrf/v2-5/security#use-requestid-to-match-randomness-requests-with-their-fulfillment-in-order).
+```solidity
+    // Chainlink VRF related variables
 
-I know this lesson was a bit abstract. But let's implement this in our project in the next lesson. See you there!
+    address immutable i_vrfCoordinator;
+```
+
+I've divided the `Raffle` variables from the `Chainlink VRF` variables to keep the contract tidy.
+
+Adjust the constructor to accommodate all the new variables and imports:
+
+```solidity
+constructor(uint256 entranceFee, uint256 interval, address vrfCoordinator) {
+  i_entranceFee = entranceFee;
+  i_interval = interval;
+  s_lastTimeStamp = block.timestamp;
+
+  i_vrfCoordinator = vrfCoordinator;
+}
+```
+
+For our imports to work we need to install the Chainlink library, and run the following command in your terminal:
+
+```bash
+forge install smartcontractkit/chainlink@42c74fcd30969bca26a9aadc07463d1c2f473b8c --no-commit
+```
+
+_P.S. I know it doesn't look amazing, bear with me._
+
+Now run `forge build`. **It will fail**, it should fail because we didn't define a ton of variables. But what matters at this point is how it fails! We need it to fail with the following error:
+
+```bash
+Error:
+Compiler run failed:
+Error (7576): Undeclared identifier.
+
+  --> src/Raffle.sol:53:8:
+```
+
+If it doesn't fail with that error but fails with this error then we need to do additional things:
+
+```bash
+Error:
+Compiler run failed:
+
+Error (6275): Source "lib/chainlink/contracts/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol" not found: File not found. Searched the following locations:
+```
+
+If you got the error above, then `forge` was not able to find out the contracts we imported. Run the following command in your terminal:
+
+```bash
+forge remappings>remappings.txt
+```
+
+This will create a new file that contains your project remappings:
+
+```bash
+chainlink/=lib/chainlink/contracts/
+
+forge-std/=lib/forge-std/src/
+```
+
+This is to be read as follows: `chainlink/` in your imports becomes `lib/chainlink/contracts/` behind the stage. We need to make sure that if we apply that change to our import the resulting PATH is correct.
+
+`chainlink/src/v0.8/vrf/VRFConsumerBaseV2.sol` becomes l`ib/chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol`, which is correct. Sometimes some elements of the PATH are either missing or doubled, as follows:
+
+`lib/chainlink/contracts/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol`
+
+or
+
+`lib/chainlink/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol`
+
+Both these variants are incorrect. You need to always be able to access the PATH in your explorer window on the left, if you can't then you need to adjust the remappings to match the lib folder structure.
+
+Great, now that we were successfully able to run the imports let's continue fixing the missing variables.
+
+Don't ever be afraid of calling `forge build` even if you know your project won't compile. Our contract lacks some variables that are required inside the `pickWinner` function. Call `forge build`.
+
+Output:
+
+```bash
+Compiler run failed:
+Error (7576): Undeclared identifier.
+  --> src/Raffle.sol:55:26:
+   |
+55 |                 keyHash: s_keyHash, // gas lane
+   |                          ^^^^^^^^^
+
+Error (7576): Undeclared identifier.
+  --> src/Raffle.sol:56:24:
+   |
+56 |                 subId: s_subscriptionId, // subscription ID
+   |                        ^^^^^^^^^^^^^^^^
+
+Error (7576): Undeclared identifier.
+  --> src/Raffle.sol:57:39:
+   |
+57 |                 requestConfirmations: requestConfirmations,
+   |                                       ^^^^^^^^^^^^^^^^^^^^
+
+Error (7576): Undeclared identifier.
+  --> src/Raffle.sol:58:35:
+   |
+58 |                 callbackGasLimit: callbackGasLimit,// make sure we don't overspend
+   |                                   ^^^^^^^^^^^^^^^^
+
+Error (7576): Undeclared identifier.
+  --> src/Raffle.sol:59:27:
+   |
+
+59 |                 numWords: numWords, // number random numbers
+```
+
+At least now we know what's left :smile:
+
+Let's add the above-mentioned variables inside the VRF state variables block:
+
+```solidity
+// Chainlink VRF related variables
+    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
+    bytes32 private immutable i_gasLane;
+    uint64 private immutable i_subscriptionId;
+    uint16 private constant REQUEST_CONFIRMATIONS = 3;
+    uint32 private immutable i_callbackGasLimit;
+
+    uint32 private constant NUM_WORDS = 1;
+```
+
+We have changed the `keyHash` name to `i_gasLane` which is more descriptive for its purpose. Also, we've changed the type of `i_vrfCoordinator`. For our pickWinner function to properly call `uint256 requestId = i_vrfCoordinator.requestRandomWords`( we need that `i_vrfCoordinator` to be a contract, specifically the `VRFCoordinatorV2Interface` contract that we've imported.
+
+For simplicity we request only 1 word, thus we make that variable constant. The same goes for request confirmations, this number can vary depending on the blockchain we chose to deploy to but for mainnet 3 is perfect. Cool!
+
+The next step is to attribute values inside the constructor:
+
+```solidity
+constructor(
+  uint256 entranceFee,
+  uint256 interval,
+  address vrfCoordinator,
+  bytes32 gasLane,
+  uint64 subscriptionId,
+  uint32 callbackGasLimit
+) VRFConsumerBaseV2(vrfCoordinator) {
+  i_entranceFee = entranceFee;
+  i_interval = interval;
+  s_lastTimeStamp = block.timestamp;
+
+  i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinator);
+  i_gasLane = gasLane;
+  i_subscriptionId = subscriptionId;
+  i_callbackGasLimit = callbackGasLimit;
+}
+```
+
+Ok, breathe, it's a lot but it's not complicated, let's go through it together:
+
+- First, we need to initiate the VRFConsumerBaseV2 using our constructor `VRFConsumerBaseV2(vrfCoordinator)`;
+
+- We are providing the `gasLane`, `subscriptionId` and `callbackGasLimit` in our input section of the constructor;
+
+- We are assigning the inputted values to the state variables we defined at an earlier point;
+
+- We are casting the `vrfCoordinator` address as `VRFCoordinatorV2Interface` to be able to call it inside the `pickWinner` function.
+
+The last step is to create a new function:
+
+```solidity
+function fulfillRandomWords(
+  uint256 requestId,
+  uint256[] memory randomWords
+) internal override {}
+```
+
+This will be called by the `vrfCoordinator` when it sends back the requested `randomWords`. This is also where we'll select our winner!
+
+Call the `forge build` again.
+
+```bash
+[⠒] Compiling...
+[⠔] Compiling 9 files with Solc 0.8.25
+[⠒] Solc 0.8.25 finished in 209.77ms
+Compiler run successful with warnings:
+Warning (2072): Unused local variable.
+  --> src/Raffle.sol:61:9:
+   |
+61 |         uint256 requestId = i_vrfCoordinator.requestRandomWords(
+   |         ^^^^^^^^^^^^^^^^^
+
+```
+
+Perfect! Don't worry we will use that `requestId` in a future lesson.
