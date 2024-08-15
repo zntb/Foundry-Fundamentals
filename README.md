@@ -1,63 +1,67 @@
-# The modulo operation
+# Implementing the lottery state - Enum
 
-## Understanding Modulo
+## Introduction to the Concept of Enum
 
-We ended the previous lesson when we defined the following function:
+In Solidity, `enum stands` for Enumerable. It is a user-defined data type that restricts a variable to have only one of the predefined values listed within the enum declaration. These predefined values are internally treated as unsigned integers, starting from 0 up to the count of elements minus one. Enums are useful for improving code readability and reducing potential errors by limiting the range of acceptable values for a variable. Read more about enums [here](https://docs.soliditylang.org/en/v0.8.26/types.html#enums).
+
+**How can we use enums in our Project?**
+
+Let's think about all the possible states of our Raffle. We deploy the contract and the raffle is started, the participants buy a ticket to register. Let's call this state `OPEN`. After this, we have a period when we need to wait at least 3 blocks for Chainlink VRF to send us the random number this means that we have at least 36 seconds (12 seconds/block) of time when our Raffle is processing the winner. Let's call this state `CALCULATING`.
+
+Let's code all these!
+
+Paste the following code between the errors definition section and the state variables section:
 
 ```solidity
-function fulfillRandomWords(
-  uint256 requestId,
-  uint256[] memory randomWords
-) internal override {}
+    // Type declarations
+    enum RaffleState {
+        OPEN,           // 0
+        CALCULATING     // 1
+    }
+
+    // Put this one in `Raffle related variables`
+
+    RaffleState private s_raffleState;
 ```
 
-As we've said before, this function is going to be called by the VRF service. Here we will be given 1 random word (1 because of the NUM_WORDS we defined in the previous lesson). This isn't a `word` as in a string of letters like `pizza`, this is a big and random uint256. Being a number we can use it to do math.
+Amazing, let's default our raffle state to open inside the constructor.
 
-What we need is to use the `modulo` operator denoted as `%` in Solidity.
-
-The modulo operation (often abbreviated as "mod") is a mathematical operation that finds the remainder when one integer is divided by another. In other words, given two numbers, a and b, the modulo operation `a % b` returns the remainder of the `a / b` division.
-
-Examples:
+Add the following inside your constructor:
 
 ```solidity
-5 % 2 = 1 // Because 5 is 2 * 2 + 1
-11 % 3 = 2 // Because 11 is 3 * 3 + 2
-159 % 50 = 9 // Because 153 is 50 * 3 + 9
-
-1000 % 10 = 0 // Because 1000 is 100 * 10 + 0
+s_raffleState = RaffleState.OPEN;
 ```
 
-We are going to use this function to pick a random winner.
+Amazing! But what's the reason we did all this? Security! The thing we love the most!
 
-Let's say we have 10 players (`s_players.length = 10`).
+Chainlink VRF has an [interesting page](https://docs.chain.link/vrf/v2-5/security) where they provide Security Considerations you should always implement when interacting with their service. One of these is called `Don't accept bids/bets/inputs after you have made a randomness request`, in our case this translates to `Don't let people buy tickets while we calculate the final winner.` I strongly encourage you to give that whole page a read, it will save you a lot of headaches.
 
-Now let's say Chainlink VRF sends back the number `123454321` (I know, super random).
-
-Given that the `% 10` operation can yield a value between \[0:9] we can use the result of the `randomNumber % 10` as the `s_players` index corresponding to the winner.
-
-Using the actual numbers:
+Let's implement this in the code:
 
 ```solidity
-123454321 % 10 = 1
-```
+function enterRaffle() external payable {
+  if (msg.value < i_entranceFee) revert Raffle__NotEnoughEthSent();
+  if (s_raffleState != RaffleState.OPEN) revert Raffle__RaffleNotOpen(); // If not open you don't enter.
 
-This means that the player with index 1 (`s_players[1]`) is the winner of our raffle! The random number will always be different and sufficiently large. Using `s_players.length` will ensure that we always include all the players who paid a ticket. Perfect!
-
-### Picking the winner
-
-Enough theory, let's implement it in code!
-
-```solidity
-function fulfillRandomWords(
-  uint256 requestId,
-  uint256[] memory randomWords
-) internal override {
-  uint256 indexOfWinner = randomWords[0] % s_players.length;
-  address payable winner = s_players[indexOfWinner];
+  s_players.push(payable(msg.sender));
+  emit EnteredRaffle(msg.sender);
 }
 ```
 
-Now let's record this last winner in state and send them their prize.
+Make sure to also define the new `Raffle__RaffleNotOpen()` error.
+
+Great, now let's also change the state of the Raffle when we commence the process of picking the winner.
+
+```solidity
+    function pickWinner() external {
+        // check to see if enough time has passed
+        if (block.timestamp - s_lastTimeStamp < i_interval) revert();
+
+
+        s_raffleState = RaffleState.CALCULATING;
+```
+
+The last thing we need to do is to reopen the Raffle after we pick the winner inside `fulfillRandomWords` function.
 
 ```solidity
 function fulfillRandomWords(
@@ -67,6 +71,7 @@ function fulfillRandomWords(
   uint256 indexOfWinner = randomWords[0] % s_players.length;
   address payable winner = s_players[indexOfWinner];
   s_recentWinner = winner;
+  s_raffleState = RaffleState.OPEN;
   (bool success, ) = winner.call{ value: address(this).balance }("");
   if (!success) {
     revert Raffle__TransferFailed();
@@ -74,19 +79,6 @@ function fulfillRandomWords(
 }
 ```
 
-Let's define the `Raffle__TransferFailed()` custom error and the `s_recentWinner` variable in the state variables section.
+I know you thought about it: `But why are we opening the Raffle again? We've selected a winner but the s_players array is still full!` And you are right!
 
-```solidity
-    error Raffle__NotEnoughEthSent();
-    error Raffle__TransferFailed();
-
-    // Raffle related variables
-    uint256 private immutable i_entranceFee;
-    uint256 private immutable i_interval;
-    uint256 private s_lastTimeStamp;
-    address payable[] private s_players;
-
-    address payable private s_recentWinner;
-```
-
-Amazing! Let's keep going!
+We will take care of this in the next lesson!
