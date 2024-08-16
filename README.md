@@ -1,186 +1,123 @@
-# Test and deploy the lottery smart contract pt.1
+# Deploy Script
 
-## Deploying and testing our lottery
-
-Now that we've got all the prerequisites for deployment let's proceed in deploying the raffle.
-
-Let's open the `DeployRaffle.s.sol` and use our new tools.
-
-First, import the newly created HelperConfig.
-
-`import {HelperConfig} from "./HelperConfig.s.sol";`
-
-Then, modify the run function:
+Let's begin by creating a new file in the `/script` directory called `DeployRaffle.sol` and importing the `Raffle` contract.
 
 ```solidity
-    function run() external returns (Raffle, HelperConfig) {
-        HelperConfig helperConfig = new HelperConfig(); // This comes with our mocks!
-        (
-            uint256 entranceFee;
-            uint256 interval;
-            address vrfCoordinator;
-            bytes32 gasLane;
-            uint64 subscriptionId;
-            uint32 callbackGasLimit;
-
-
-        ) = helperConfig.activeNetworkConfig();
-```
-
-Great! Now that we have deconstructed the NetworkConfig we have all the variables we need to deploy:
-
-```solidity
-    vm.startBroadcast();
-    Raffle raffle = new Raffle(
-        entranceFee,
-        interval,
-        vrfCoordinator,
-        gasLane,
-        subscriptionId,
-        callbackGasLimit
-    )
-    vm.stopBroadcast();
-
-
-    return raffle;
-
-```
-
-We use the `vm.startBroadcast` and `vm.stopBroadcast` commands to indicate that we are going to send a transaction. The transaction is the deployment of a new `Raffle` contract using the parameters we've obtained from the `HelperConfig`. In the end, we are returning the newly deployed contract.
-
-This code is good on its own, but, we can make it better. For example, we need a `subscriptionId`. We can either obtain this through the front end as we've learned in a previous lesson, or we can get on programmatically. For now, we'll leave everything as is, but we will refactor this in the future.
-
-Before that, let's write some tests.
-
-Inside the `test` folder create two new folders called `intergration` and `unit`. Here we'll put our integration and unit tests. Inside the newly created `unit` folder create a file called `RaffleTest.t.sol`.
-
-Let's start writing the first test. You've already done this at least two times in this section. Try to do it on your own and come back when you get stuck.
-
-Your unit test should start like this:
-
-```solidity
-// SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.19;
-
-import { DeployRaffle } from "../../script/DeployRaffle.s.sol";
-import { Raffle } from "../../src/Raffle.sol";
-import { Test, console } from "forge-std/Test.sol";
-import { HelperConfig } from "../../script/HelperConfig.s.sol";
-
-contract RaffleTest is Test {}
+import { Script } from "forge-std/Script.sol";
+import { Raffle } from "../src/Raffle.sol";
 ```
 
-We've declared the SPDX-License-Identifier, the solidity version, imported the `DeployRaffle` which we will use to deploy our contract, then `Raffle` the contract to be deployed and then `Test` and `console` which are required for Foundry to function.
+> 🗒️ **NOTE**
+> There are two ways to import files in Solidity: using a direct path or a relative path. In this example, we are using a relative path, where the `Raffle.sol` file is inside the `src` directory but one level up (`..`) from the current file's location.
 
-In `DeployRaffle.s.sol` we need to make sure that `run` also returns the `HelperConfig` contract:
+## The `deployContract` Function
 
-```solidity
-function run() external returns (Raffle, HelperConfig) {
-  HelperConfig helperConfig = new HelperConfig();
-  (
-    uint256 entranceFee,
-    uint256 interval,
-    address vrfCoordinator,
-    bytes32 gasLane,
-    uint64 subscriptionId,
-    uint32 callbackGasLimit
-  ) = helperConfig.activeNetworkConfig();
-
-  vm.startBroadcast();
-  Raffle raffle = new Raffle(
-    entranceFee,
-    interval,
-    vrfCoordinator,
-    gasLane,
-    subscriptionId,
-    callbackGasLimit
-  );
-  vm.stopBroadcast();
-
-  return (raffle, helperConfig);
-}
-```
-
-Next comes the state variables and `setUp` function in `RaffleTest.t.sol`:
+Next, let's define a function called `deployContract` to handle the **deployment process**. This function will be similar to the one we used in the `FundMe` contract.
 
 ```solidity
-contract RaffleTest is Test {
-  Raffle public raffle;
-  HelperConfig public helperConfig;
+contract DeployRaffle is Script {
+  function run() external {
+    deployContract();
+  }
 
-  uint256 entranceFee;
-  uint256 interval;
-  address vrfCoordinator;
-  bytes32 gasLane;
-  uint64 subscriptionId;
-  uint32 callbackGasLimit;
-
-  address public PLAYER = makeAddr("player");
-  uint256 public constant STARTING_USER_BALANCE = 10 ether;
-
-  function setUp() external {
-    DeployRaffle deployer = new DeployRaffle();
-    (raffle, helperConfig) = deployer.run();
-    vm.deal(PLAYER, STARTING_USER_BALANCE);
-
-    (
-      entranceFee,
-      interval,
-      vrfCoordinator,
-      gasLane,
-      subscriptionId,
-      callbackGasLimit
-    ) = helperConfig.activeNetworkConfig();
+  function deployContract() internal returns (Raffle, HelperConfig) {
+    // Implementation will go here
   }
 }
 ```
 
-This seems like a lot, but it isn't, let's go through it.
+To deploy our contract, we need various parameters required by the `Raffle` contract, such as `entranceFee`, `interval`, `vrfCoordinator`, `gasLane`, `subscriptionId`, and `callbackGasLimit`. The values for these parameters will vary _depending on the blockchain network we deploy to_. Therefore, we should create a `HelperConfig` file to specify these values based on the target deployment network.
 
-- We made `RaffleTest` contract inherit `Test` to enable the testing functionality;
-- We've defined a `raffle` and `helperConfig` variables to store the contracts;
-- Next, we defined the variables required for the deployment;
-- Then, we created a new user called `PLAYER` and defined how many tokens they should receive;
-- Inside the `setUp` function, we deploy the `DeployRaffle` contract then we use it to deploy the `Raffle` and `HelperConfig` contracts;
-- We `deal` the `PLAYER` the defined `STARTING_USER_BALANCE`;
-- We call `helperConfig.activeNetworkConfig` to get the Raffle configuration parameters.
+### The `HelperConfig.s.sol` Contract
 
-Amazing! With all these done let's write a small test to ensure our `setUp` is functioning properly.
-
-First, we need a getter function to retrieve the raffle state. Put the following towards the end of the `Raffle.sol`:
+To retrieve the correct networ configuration, we can create a new file in the same directory called `HelperConfig.s.sol` and define a **Network Configuration Structure**:
 
 ```solidity
-function getRaffleState() public view returns (RaffleState) {
-  return s_raffleState;
+contract HelperConfig is Script {
+  struct NetworkConfig {
+    uint256 entranceFee;
+    uint256 interval;
+    address vrfCoordinator;
+    bytes32 gasLane;
+    uint32 callbackGasLimit;
+    uint256 subscriptionId;
+  }
 }
 ```
 
-Inside `RaffleTest.t.sol` paste the following test:
+We'll then define two functions that return the _network-specific configuration_. We'll set up these functions for Sepolia and a local network.
 
 ```solidity
-function testRaffleInitializesInOpenState() public view {
-  assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);
+function getSepoliaEthConfig() public pure returns (NetworkConfig memory) {
+  return
+    NetworkConfig({
+      entranceFee: 0.01 ether, //1e16
+      interval: 30, // 30 seconds
+      vrfCoordinator: 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B,
+      gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
+      callbackGasLimit: 500000, //500,000 gas
+      subscriptionId: 0
+    });
+}
+
+function getLocalConfig() public pure returns (NetworkConfig memory) {
+  return
+    NetworkConfig({
+      entranceFee: 0.01 ether,
+      interval: 30, // 30 seconds
+      vrfCoordinator: address(0),
+      gasLane: "",
+      callbackGasLimit: 500000,
+      subscriptionId: 0
+    });
 }
 ```
 
-**Note**: we used `Raffle.RaffleState.OPEN` to get the value attributed to `OPEN` inside the `RaffleState` enum. This is possible because `RaffleState` is considered a [type](https://docs.soliditylang.org/en/latest/types.html#enums). So we can access that by calling the type `RaffleState` inside a `Raffle` contract to retrieve the `OPEN` value.
+We will then create an abstract contract `CodeConstants` where we define some network IDs. The `HelperConfig` contract will be able to use them later through ineritance.
 
-Great! Let's run the test and see how it goes:
-
-`forge test --mt testRaffleInitializesInOpenState -vv`
-
-The output being:
-
-```bash
-Ran 1 test for test/unit/RaffleTest.t.sol:RaffleTest
-[PASS] testRaffleInitializesInOpenState() (gas: 7707)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 12.42ms (51.80µs CPU time)
-
-
-Ran 1 test suite in 2.25s (12.42ms CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)
+```solidity
+abstract contract CodeConstants {
+  uint256 public constant ETH_SEPOLIA_CHAIN_ID = 11155111;
+  uint256 public constant LOCAL_CHAIN_ID = 31337;
+}
 ```
 
-Ok, so our Raffle starts in an OPEN state. Exactly like we coded it!
+These values can be used inside the `HelperConfig` constructor:
 
-Great job! We started testing, let's see what we can do next!
+> 👀❗**IMPORTANT**
+> We are choosing the use of **constants** over magic numbers
+
+```solidity
+constructor() {
+  networkConfigs[ETH_SEPOLIA_CHAIN_ID] = getSepoliaEthConfig();
+}
+```
+
+We also have to build a function to fetch the appropriate configuration based on the actual chain ID. This can be done first by verifying that a VRF coordinator exists. In case it does not and we are not on a local chain, we'll revert.
+
+```solidity
+function getConfigByChainId(
+  uint256 chainId
+) public view returns (NetworkConfig memory) {
+  if (networkConfigs[chainId].vrfCoordinator != address(0)) {
+    return networkConfigs[chainId];
+  } else if (chainId == LOCAL_CHAIN_ID) {
+    return getOrCreateAnvilEthConfig();
+  } else {
+    revert HelperConfig__InvalidChainId();
+  }
+}
+```
+
+In case we are on a local chain but the VRF coordinator has already been set, we should use the existing configuration already created.
+
+```solidity
+function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
+    // Check to see if we set an active network config
+    if (localNetworkConfig.vrfCoordinator != address(0)) {
+        return localNetworkConfig;
+}
+```
+
+This approach ensures that we have a robust configuration mechanism that adapts to the actual deployment environment.
