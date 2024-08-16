@@ -1,13 +1,42 @@
-# Important: Note on learning by building
+# The CEI method - Checks, Effects, Interactions
 
-## Tutorials vs Real-World Smart-Contract Building
+## The Checks-Effects-Interactions (CEI) Pattern
 
-When it comes to building solidity projects, things may seem a bit too linear or straightforward when you watch a demo or read a tutorial. Looking at a video where Patrick streamlines a project from start to finish and his code compiling from the first try 99.9% of the time might give you the wrong idea of how this process normally goes.
+A very important thing to note. When developing this contract Patrick is using a style called Checks-Effects-Interactions or CEI.
 
-Keep in mind that Patrick built this project or a close version of it using Solidity + Brownie, Solidity + Hardhat and now Solidity + Foundry and probably updated them multiple times to adjust for different changes in Solidity versions, VRF versions and so on. When building something completely new, Patrick, like any other smart contract developer, doesn't do it seamlessly or in one go.
+The Checks-Effects-Interactions pattern is a crucial best practice in Solidity development aimed at enhancing the security of smart contracts, especially against re-entrancy attacks. This pattern structures the code within a function into three distinct phases:
 
-Normally, when you start building a new project, you will write 1-2 functions and then try to compile it ... and BAM, it doesn't compile, you go and fix that and then you write a couple of tests to ensure the functionality you intend is there ... and some of these tests fail. Why do they fail? You go back to the code, make some changes, compile it again, test it again and hopefully everything passes. Amazing, you just wrote your first 1-2 functions, your project will most likely need 10 more. This might look cumbersome, but it's the best way to develop a smart contract, far better than trying to punch in 10 functions and then trying to find out where's the bug that prevents the contract from compiling. The reason why Patrick is not testing every single thing on every single step is, as you've guessed, the fact that the contract will be refactored over and over again, and testing a function that will be heavily modified two lessons from now is not that efficient.
+- Checks: Validate inputs and conditions to ensure the function can execute safely. This includes checking permissions, input validity, and contract state prerequisites.
+- Effects: Modify the state of our contract based on the validated inputs. This phase ensures that all internal state changes occur before any external interactions.
+- Interactions: Perform external calls to other contracts or accounts. This is the last step to prevent reentrancy attacks, where an external call could potentially call back into the original function before it completes, leading to unexpected behavior. (More about reentrancy attacks on a later date)
 
-**_You won't develop smart contracts without setbacks. And that is ok!_**
+Another important reason for using CEI in your smart contract is gas efficiency. Let's go through a small example:
 
-**_Setbacks are not indicators of failure, they are signs of growth and learning._**
+```solidity
+function coolFunction() public {
+  sendA();
+  callB();
+  checkX();
+  checkY();
+  updateM();
+}
+```
+
+In the function above what happens if `checkX()` fails? The EVM goes through a function from top to bottom. That means it will execute `sendA()` then `callB()` then attempt `checkX()` which will fail, and then all the things need to be reverted. Every single operation costs gas, we pay for everything, and we just performed 2 operations, to revert at the 3rd. From this perspective isn't the following more logical?
+
+```solidity
+function coolFunction() public {
+  // Checks
+  checkX();
+  checkY();
+
+  // Effects
+  updateStateM();
+
+  // Interactions
+  sendA();
+  callB();
+}
+```
+
+First, we do the checks, if something goes bad we revert, but we don't spend that much gas. Then, if checks pass, we do effects, and all internal state changes are performed, these usually can't fail, or if they fail they spend an amount of gas that we can control. Lastly, we perform the interactions, here we send the tokens or ETH or perform external calls to other contracts. We wouldn't want these to happen in the absence of the checks or the state update so it's more logical to put them last.
