@@ -1,29 +1,13 @@
-# Lottery restart - Resetting an Array
+# Important: Note on learning by building
 
-## Resetting the Player Array
+## Tutorials vs Real-World Smart-Contract Building
 
-Continuing from where we left in the last lesson. We've picked the winner, we've opened the lottery and ... what do we do with the players already in the array? They've had their chance to win and they didn't.
+When it comes to building solidity projects, things may seem a bit too linear or straightforward when you watch a demo or read a tutorial. Looking at a video where Patrick streamlines a project from start to finish and his code compiling from the first try 99.9% of the time might give you the wrong idea of how this process normally goes.
 
-We add the following line inside the `fulfillRandomWords` function:
+Keep in mind that Patrick built this project or a close version of it using Solidity + Brownie, Solidity + Hardhat and now Solidity + Foundry and probably updated them multiple times to adjust for different changes in Solidity versions, VRF versions and so on. When building something completely new, Patrick, like any other smart contract developer, doesn't do it seamlessly or in one go.
 
-```solidity
-s_players = new address payable[](0);
-```
+Normally, when you start building a new project, you will write 1-2 functions and then try to compile it ... and BAM, it doesn't compile, you go and fix that and then you write a couple of tests to ensure the functionality you intend is there ... and some of these tests fail. Why do they fail? You go back to the code, make some changes, compile it again, test it again and hopefully everything passes. Amazing, you just wrote your first 1-2 functions, your project will most likely need 10 more. This might look cumbersome, but it's the best way to develop a smart contract, far better than trying to punch in 10 functions and then trying to find out where's the bug that prevents the contract from compiling. The reason why Patrick is not testing every single thing on every single step is, as you've guessed, the fact that the contract will be refactored over and over again, and testing a function that will be heavily modified two lessons from now is not that efficient.
 
-This initializes a new empty array over the existing array, which is another way of saying `we wipe out the existing array`.
+**_You won't develop smart contracts without setbacks. And that is ok!_**
 
-Additionally, given that we are starting up a fresh raffle, we also need to bring the `s_lastTimeStamp` to the present time.
-
-```solidity
-s_lastTimeStamp = block.timestamp;
-```
-
-The last thing we need to do is to emit an event that logs the fact that we picked a winner.
-
-Put this in your events section: `event PickedWinner(address winner);`.
-
-And emit it as the last line of the `fulfillRandomWords` function: `emit PickedWinner(winner);`.
-
-Run a `forge build` to make sure everything compiles.
-
-Great job!
+**_Setbacks are not indicators of failure, they are signs of growth and learning._**
