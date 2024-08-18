@@ -1,123 +1,77 @@
-# Deploy Script
+# Deploy a mock Chainlink VRF
 
-Let's begin by creating a new file in the `/script` directory called `DeployRaffle.sol` and importing the `Raffle` contract.
+## Chainlink VRF mock contract
 
-```solidity
-pragma solidity ^0.8.19;
-import { Script } from "forge-std/Script.sol";
-import { Raffle } from "../src/Raffle.sol";
-```
+A mock contract is a type of smart contract used in testing and development environments to simulate the behavior of real contracts. It allows us to create controlled and predictable scenarios for testing purposes without relying on actual external contracts or data sources. Moreover, it facilitates testing using Anvil, which is extremely fast and practical in comparison to a testnet.
 
-> 🗒️ **NOTE**
-> There are two ways to import files in Solidity: using a direct path or a relative path. In this example, we are using a relative path, where the `Raffle.sol` file is inside the `src` directory but one level up (`..`) from the current file's location.
-
-## The `deployContract` Function
-
-Next, let's define a function called `deployContract` to handle the **deployment process**. This function will be similar to the one we used in the `FundMe` contract.
+In the last lesson, we stopped on `HelperConfig.s.sol`:
 
 ```solidity
-contract DeployRaffle is Script {
-  function run() external {
-    deployContract();
-  }
-
-  function deployContract() internal returns (Raffle, HelperConfig) {
-    // Implementation will go here
+function getOrCreateAnvilEthConfig()
+  public
+  returns (NetworkConfig memory anvilNetworkConfig)
+{
+  // Check to see if we set an active network config
+  if (activeNetworkConfig.vrfCoordinatorV2 != address(0)) {
+    return activeNetworkConfig;
   }
 }
 ```
 
-To deploy our contract, we need various parameters required by the `Raffle` contract, such as `entranceFee`, `interval`, `vrfCoordinator`, `gasLane`, `subscriptionId`, and `callbackGasLimit`. The values for these parameters will vary _depending on the blockchain network we deploy to_. Therefore, we should create a `HelperConfig` file to specify these values based on the target deployment network.
+We need to treat the other side of the `(activeNetworkConfig.vrfCoordinatorV2 != address(0))` condition. What happens if that is false?
 
-### The `HelperConfig.s.sol` Contract
+If that is false we need to deploy a mock vrfCoordinatorV2 and pass its address inside a `NetworkConfig` that will be used on Anvil.
 
-To retrieve the correct networ configuration, we can create a new file in the same directory called `HelperConfig.s.sol` and define a **Network Configuration Structure**:
+Please use your Explorer on the left side to access the following path:
+
+`foundry-f23/foundry-smart-contract-lottery-f23/lib/chainlink/contracts/src/v0.8/vrf`
+
+Inside you'll find multiple folders, one of which is called `mocks`. Inside that folder, you can find the `VRFCoordinatorV2Mock` mock contract created by Chainlink.
+
+Add the following line in the imports section of `HelperConfig.s.sol`:
 
 ```solidity
-contract HelperConfig is Script {
-  struct NetworkConfig {
-    uint256 entranceFee;
-    uint256 interval;
-    address vrfCoordinator;
-    bytes32 gasLane;
-    uint32 callbackGasLimit;
-    uint256 subscriptionId;
-  }
+import { VRFCoordinatorV2Mock } from "chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
+```
+
+Amazing! Now let's keep on working on the `getOrCreateAnvilEthConfig` function. We need to deploy the `vrfCoordinatorV2Mock`, but if we open it we'll see that its constructor requires some parameters:
+
+```solidity
+constructor(uint96 _baseFee, uint96 _gasPriceLink) ConfirmedOwner(msg.sender) {
+  BASE_FEE = _baseFee;
+  GAS_PRICE_LINK = _gasPriceLink;
+  setConfig();
 }
 ```
 
-We'll then define two functions that return the _network-specific configuration_. We'll set up these functions for Sepolia and a local network.
+The `_baseFee` is the flat fee that VRF charges for the provided randomness and `_gasPriceLink` which is the gas consumed by the VRF node when calling your function. Given the way it's structured the callback gas is paid initially by the node which needs to be reimbursed. Both these parameters are denominated in LINK tokens.
+
+We add the following lines to the `getOrCreateAnvilEthConfig` function:
 
 ```solidity
-function getSepoliaEthConfig() public pure returns (NetworkConfig memory) {
-  return
-    NetworkConfig({
-      entranceFee: 0.01 ether, //1e16
-      interval: 30, // 30 seconds
-      vrfCoordinator: 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B,
-      gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
-      callbackGasLimit: 500000, //500,000 gas
-      subscriptionId: 0
-    });
-}
+        uint96 baseFee = 0.25 ether; // To be understood as 0.25 LINK
+        uint96 gasPriceLink = 1e9; // 1 gwei LINK
 
-function getLocalConfig() public pure returns (NetworkConfig memory) {
-  return
-    NetworkConfig({
-      entranceFee: 0.01 ether,
-      interval: 30, // 30 seconds
-      vrfCoordinator: address(0),
-      gasLane: "",
-      callbackGasLimit: 500000,
-      subscriptionId: 0
-    });
-}
+        vm.startBroadcast();
+        VRFCoordinatorV2Mock vrfCoordinatorV2Mock = new VRFCoordinatorV2Mock(
+            baseFee,
+            gasPriceLink
+
+        );
 ```
 
-We will then create an abstract contract `CodeConstants` where we define some network IDs. The `HelperConfig` contract will be able to use them later through ineritance.
+Amazing! Now that we have everything we need, let's perform the return, similar to what we did in `getSepoliaEthConfig`.
 
 ```solidity
-abstract contract CodeConstants {
-  uint256 public constant ETH_SEPOLIA_CHAIN_ID = 11155111;
-  uint256 public constant LOCAL_CHAIN_ID = 31337;
-}
+        return NetworkConfig({
+            entranceFee: 0.01 ether,
+            interval: 30, // 30 seconds
+            vrfCoordinator: address(vrfCoordinatorV2Mock),
+            gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
+            subscriptionId: 0, // If left as 0, our scripts will create one!
+            callbackGasLimit: 500000 // 500,000 gas
+
+        });
 ```
 
-These values can be used inside the `HelperConfig` constructor:
-
-> 👀❗**IMPORTANT**
-> We are choosing the use of **constants** over magic numbers
-
-```solidity
-constructor() {
-  networkConfigs[ETH_SEPOLIA_CHAIN_ID] = getSepoliaEthConfig();
-}
-```
-
-We also have to build a function to fetch the appropriate configuration based on the actual chain ID. This can be done first by verifying that a VRF coordinator exists. In case it does not and we are not on a local chain, we'll revert.
-
-```solidity
-function getConfigByChainId(
-  uint256 chainId
-) public view returns (NetworkConfig memory) {
-  if (networkConfigs[chainId].vrfCoordinator != address(0)) {
-    return networkConfigs[chainId];
-  } else if (chainId == LOCAL_CHAIN_ID) {
-    return getOrCreateAnvilEthConfig();
-  } else {
-    revert HelperConfig__InvalidChainId();
-  }
-}
-```
-
-In case we are on a local chain but the VRF coordinator has already been set, we should use the existing configuration already created.
-
-```solidity
-function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
-    // Check to see if we set an active network config
-    if (localNetworkConfig.vrfCoordinator != address(0)) {
-        return localNetworkConfig;
-}
-```
-
-This approach ensures that we have a robust configuration mechanism that adapts to the actual deployment environment.
+Great! Now this is fixed let's continue testing and deploying our Raffle contract.
