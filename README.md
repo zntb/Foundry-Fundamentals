@@ -1,115 +1,107 @@
-# Test and deploy the lottery smart contract pt.2
+# Setup the tests
 
-## Next steps
+## Continuing our testing journey
 
-Great! We've written some amazing code, but you know our job here is not done! We need to test it. Let's be smart about testing, what do we need to be able to properly test the contract and what kind of tests shall we do?
+Let's jump straight into testing! But ... where do we start?
 
-**Plan:**
+Easy! Let's call `forge -coverage`:
 
-1. Write deploy scripts
-2. Write tests
-   1. Local chain
-   2. Forked Testnet
-   3. Forked Mainnet
-3. Maybe deploy and run on Sepolia?
+```bash
+Analysing contracts...
+Running tests...
+| File                      | % Lines       | % Statements   | % Branches    | % Funcs       |
+| ------------------------- | ------------- | -------------- | ------------- | ------------- |
+| script/DeployRaffle.s.sol | 100.00% (7/7) | 100.00% (9/9)  | 100.00% (0/0) | 100.00% (1/1) |
+| script/HelperConfig.s.sol | 0.00% (0/9)   | 0.00% (0/13)   | 0.00% (0/2)   | 0.00% (0/2)   |
+| src/Raffle.sol            | 2.94% (1/34)  | 2.33% (1/43)   | 0.00% (0/8)   | 7.69% (1/13)  |
 
-### Deployment scripts
+| Total                     | 16.00% (8/50) | 15.38% (10/65) | 0.00% (0/10)  | 12.50% (2/16) |
+```
 
-Please create a new file called `DeployRaffle.s.sol` inside the `script` folder.
+These numbers are weak! Let's improve them!
 
-And now you know the drill, go write as much of it as you can! After you get stuck or after you finish come back and check it against the version below:
+Open the `RaffleTest.t.sol` inside the `test/unit` folder.
+
+In my opinion, when one needs to decide where to start testing there are two sensible approaches one could take:
+
+1. Easy to Complex - start with view functions, then with smaller functions and advance to the more complex functions;
+
+2. From the main entry point(s) to the periphery - what is the main functionality that the external user needs to call in order to interact with your contract;
+
+Patrick chose number 2. So what is the main entry point of our Raffle contract? The `enterRaffle` function.
+
+Let's look closely at it:
 
 ```solidity
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+function enterRaffle() external payable {
+  if (msg.value < i_entranceFee) revert Raffle__NotEnoughEthSent();
+  if (s_raffleState != RaffleState.OPEN) revert Raffle__RaffleNotOpen();
 
-import { Script } from "forge-std/Script.sol";
-import { Raffle } from "../src/Raffle.sol";
-
-contract DeployRaffle is Script {
-  function run() external returns (Raffle) {}
+  s_players.push(payable(msg.sender));
+  emit EnteredRaffle(msg.sender);
 }
 ```
 
-We've started with the traditional `SPDX` declaration, then specified the `pragma solidity` version. We imported the `Script` from Foundry and the `Raffle` contract because we want to do a Raffle deployment script, declared the contract's name and made it inherit `Script` and created the `run` function which will return our `Raffle` contract deployment. Great!
+1. We check if the `msg.value` is high enough;
 
-Let's work smart, looking again over the plan we see that we'll have to deploy the Raffle contract on at least 3 different chains. Let's stop here with the deployment script and work on the `HelperConfig`.
+2. We check if the `RaffleState` is `OPEN`;
 
-Create a new file called `HelperConfig.s.sol` in the `script` folder.
+3. If all of the above are true then the `msg.sender` should be pushed in the `s_players` array;
 
-Inside let's create the `HelperConfig` contract:
+4. Our function emits the `EnteredRaffle` event.
 
-```solidity
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+Let's test point 1:
 
-import {Script} from "forge-std/Script.sol";
-
-contract HelperConfig is Script {
-
-    struct NetworkConfig {
-        uint256 entranceFee;
-        uint256 interval;
-        address vrfCoordinator;
-        bytes32 gasLane;
-        uint64 subscriptionId;
-        uint32 callbackGasLimit;
+```sh
+    function testRaffleRevertsWHenYouDontPayEnough() public {
+        // Arrange
+        vm.prank(PLAYER);
+        // Act / Assert
+        vm.expectRevert(Raffle.Raffle__NotEnoughEthSent.selector);
+        raffle.enterRaffle();
 
     }
 ```
 
-We start with the `SPDX`and `pragma solidity` declarations. Then, we import `Script` from Foundry, name the contract and make it inherit `Script`. Cool! Now what do we need to deploy the `Raffle` contract? That information can be easily found in the `Raffle` contract's constructor:
+We call `vm.prank(PLAYER)` to configure the fact that the next transaction will be called by the `PLAYER`. [Refresher](https://book.getfoundry.sh/cheatcodes/prank?highlight=prank#prank)
 
-`constructor(uint256 entranceFee, uint256 interval, address vrfCoordinator, bytes32 gasLane, uint64 subscriptionId, uint32 callbackGasLimit)`
+After that we use the `vm.expectRevert` [cheatcode](https://book.getfoundry.sh/cheatcodes/expect-revert?highlight=expectRevert#expectrevert) to test if the next call will revert. We also have the option to specify the error message. You can do that by calling the `errorName.selector` as input of the `vm.expectRevert` cheatcode. Following that we call the `enterRaffle` without specifying the `value` of the transaction.
 
-We created a new struct called `NetworkConfig` and we matched its contents with the Raffle's constructor input.
+Run the test using `forge test --mt testRaffleRevertsWHenYouDontPayEnought`.
 
-Great! Now let's design a function that returns the proper config for Sepolia:
+```bash
+Ran 1 test for test/unit/RaffleTest.t.sol:RaffleTest
+[PASS] testRaffleRevertsWHenYouDontPayEnought() (gas: 10865)
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.99ms (161.70µs CPU time)
+```
+
+We will skip point 2 for now, let's go straight to point 3:
+
+But before being able to test if a player is properly recorded in the `s_players` array we first need a view function to access the players in the `s_players`:
 
 ```solidity
-function getSepoliaEthConfig() public pure returns (NetworkConfig memory) {
-  return
-    NetworkConfig({
-      entranceFee: 0.01 ether,
-      interval: 30, // 30 seconds
-      vrfCoordinator: 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B,
-      gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
-      subscriptionId: 0, // If left as 0, our scripts will create one!
-      callbackGasLimit: 500000 // 500,000 gas
-    });
+function getPlayer(uint256 index) public view returns (address) {
+  return s_players[index];
 }
 ```
 
-The function above returns a `NetworkConfig` struct with data taken from [here](https://docs.chain.link/vrf/v2/subscription/supported-networks#sepolia-testnet). The `interval`, `entranceFee` and `callbackGasLimit` were selected by Patrick.
-
-Ok, we need a couple more things. We need a constructor that checks what blockchain we are on and attributes a state variable, let's call it `activeNetworkConfig`, the proper config for the chain used.
+Now that we have all the tools we need:
 
 ```solidity
-    NetworkConfig public activeNetworkConfig;
-    constructor() {
-        if (block.chainid == 11155111) {
-            activeNetworkConfig = getSepoliaEthConfig();
-        } else {
-            activeNetworkConfig = getOrCreateAnvilEthConfig();
-        }
-
-    }
+function testRaffleRecordsPlayerWhenTheyEnter() public {
+  // Arrange
+  vm.prank(PLAYER);
+  // Act
+  raffle.enterRaffle{ value: entranceFee }();
+  // Assert
+  address playerRecorded = raffle.getPlayer(0);
+  assert(playerRecorded == PLAYER);
+}
 ```
 
-Good, we only missing the `getOrCreateAnvilEthConfig` function.
+We start by pranking the PLAYER, then properly calling the `enterRaffle` function specifying the correct `value`. We call the new getPLayer function to copy the player recorded at index 0 in memory. Then we compare that value to the `PLAYER` address to ensure they match.
 
-For now, let's create only a part of it:
+Test it with the following command: `forge test --mt testRaffleRecordsPlayerWhenTheyEnter`.
 
-```solidity
-    function getOrCreateAnvilEthConfig()
-        public
-        returns (NetworkConfig memory anvilNetworkConfig)
-    {
-        // Check to see if we set an active network config
-        if (activeNetworkConfig.vrfCoordinator != address(0)) {
-            return activeNetworkConfig;
-        }
-
-```
-
-We check if the `activeNetworkConfig` is populated, and if is we return it. If not we need to deploy some mocks. But more on that in the next lesson.
+Amazing work! Let's continue in the next lesson! We are going to learn how to test events in Foundry.
