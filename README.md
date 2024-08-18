@@ -1,51 +1,53 @@
-# Testing events
+# Using vm.roll and vm.wrap
 
-Picking up from where we left in the previous lesson. The only point left is:
+vm.roll and vm.wrap
+In Lesson 19 we skipped testing one of the four steps of enterRaffle: 2. We check if the `RaffleState` is `OPEN`;
 
-``4. Our function emits the `EnteredRaffle` event.``
-
-Before jumping into the test writing we need to look a bit into the cheatcode that we can use in Foundry to test events: [expectEmit](https://book.getfoundry.sh/cheatcodes/expect-emit?highlight=expectEm#expectemit).
-
-The first step is to declare the event inside your test contract.
-
-So, inside `RaffleTest.t.sol` declare the following event:
-
-`event EnteredRaffle(address indexed player);`
-
-Then we proceed to the test:
+To rephrase it, a user should not be able to enter if the RaffleState is `CALCULATING`.
 
 ```solidity
-function testEmitsEventOnEntrance() public {
+function testDontAllowPlayersToEnterWhileRaffleIsCalculating() public {
   // Arrange
   vm.prank(PLAYER);
+  raffle.enterRaffle{ value: entranceFee }();
+  vm.warp(block.timestamp + interval + 1);
+  vm.roll(block.number + 1);
+  raffle.performUpkeep("");
 
   // Act / Assert
-  vm.expectEmit(true, false, false, false, address(raffle));
-  emit EnteredRaffle(PLAYER);
+  vm.expectRevert(Raffle.Raffle__RaffleNotOpen.selector);
+  vm.prank(PLAYER);
   raffle.enterRaffle{ value: entranceFee }();
 }
 ```
 
-- We prank the `PLAYER`;
-- We call the `expectEmit` cheatcode - `vm.expectEmit(true, false, false, false, address(raffle));`
-  I know this looks a bit weird. But let's look at what `expectEmit` expects:
+We start our test exactly like the others. We `prank` the `PLAYER` and we call `enterRaffle` specifying the appropriate `msg.value` so our user registers properly.
 
-```solidity
-function expectEmit(
-  bool checkTopic1,
-  bool checkTopic2,
-  bool checkTopic3,
-  bool checkData,
-  address emitter
-) external;
+The following step involves calling two new cheatcodes:
+
+- [vm.warp](https://book.getfoundry.sh/cheatcodes/warp?highlight=warp#warp) which sets the `block.timestamp`;
+- [vm.roll](https://book.getfoundry.sh/cheatcodes/roll?highlight=roll#roll) which sets the `block.number`;
+
+Even though we don't use them here it's important to know that there are other `block.timestamp` manipulation cheatcodes that you'll encounter in your development/security path.
+
+- [skip](https://book.getfoundry.sh/reference/forge-std/skip) which skips forward the `block.timestamp` by the specified number of seconds;
+- [rewind](https://book.getfoundry.sh/reference/forge-std/rewind) which is the antonym of `skip`, i.e. it rewinds the `block.timestamp` by a specified number of seconds;
+
+So we use the `vm.warp` and `vm.roll` to push the `block.timestamp` and `block.number` in the future.
+
+We call `performUpkeep` to change the `RaffleState` to `CALCULATING`.
+
+Following that we call the `vm.expectRevert` cheatcode, expecting to revert the next call with the `Raffle__RaffleNotOpen` error.
+
+The last step is pranking the `PLAYER` again and calling `enterRaffle` to check if it reverts as it should.
+
+Run the test using `forge test --mt testDontAllowPlayersToEnterWhileRaffleIsCalculating`
+
+```bash
+Ran 1 test for test/unit/RaffleTest.t.sol:RaffleTest
+[FAIL. Reason: InvalidConsumer()] testDontAllowPlayersToEnterWhileRaffleIsCalculating() (gas: 101956)
+
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 2.70ms (206.20µs CPU time)
 ```
 
-The `checkTopic` 1-3 corresponds to the indexed parameters we are using inside our event. The `checkData` corresponds to any unindexed parameters inside the event, and, finally, the `expectEmit` expects the address that emitted the event. It looks like this `vm.expectEmit(true, false, false, false, address(raffle));` because we only have one indexed parameter inside the event.
-
-- We need to manually emit the event we expect to be emitted. That's why we declared it earlier;
-
-- We make the function call that should emit the event.
-
-Run the test using the following command: `forge test --mt testEmitsEventOnEntrance`
-
-Everything passes, amazing!
+OH NO! `[FAIL. Reason: InvalidConsumer()]` ... we gonna fix this one soon, I promise!
