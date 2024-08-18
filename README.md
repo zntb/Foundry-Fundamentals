@@ -1,77 +1,115 @@
-# Deploy a mock Chainlink VRF
+# Test and deploy the lottery smart contract pt.2
 
-## Chainlink VRF mock contract
+## Next steps
 
-A mock contract is a type of smart contract used in testing and development environments to simulate the behavior of real contracts. It allows us to create controlled and predictable scenarios for testing purposes without relying on actual external contracts or data sources. Moreover, it facilitates testing using Anvil, which is extremely fast and practical in comparison to a testnet.
+Great! We've written some amazing code, but you know our job here is not done! We need to test it. Let's be smart about testing, what do we need to be able to properly test the contract and what kind of tests shall we do?
 
-In the last lesson, we stopped on `HelperConfig.s.sol`:
+**Plan:**
+
+1. Write deploy scripts
+2. Write tests
+   1. Local chain
+   2. Forked Testnet
+   3. Forked Mainnet
+3. Maybe deploy and run on Sepolia?
+
+### Deployment scripts
+
+Please create a new file called `DeployRaffle.s.sol` inside the `script` folder.
+
+And now you know the drill, go write as much of it as you can! After you get stuck or after you finish come back and check it against the version below:
 
 ```solidity
-function getOrCreateAnvilEthConfig()
-  public
-  returns (NetworkConfig memory anvilNetworkConfig)
-{
-  // Check to see if we set an active network config
-  if (activeNetworkConfig.vrfCoordinatorV2 != address(0)) {
-    return activeNetworkConfig;
-  }
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import { Script } from "forge-std/Script.sol";
+import { Raffle } from "../src/Raffle.sol";
+
+contract DeployRaffle is Script {
+  function run() external returns (Raffle) {}
 }
 ```
 
-We need to treat the other side of the `(activeNetworkConfig.vrfCoordinatorV2 != address(0))` condition. What happens if that is false?
+We've started with the traditional `SPDX` declaration, then specified the `pragma solidity` version. We imported the `Script` from Foundry and the `Raffle` contract because we want to do a Raffle deployment script, declared the contract's name and made it inherit `Script` and created the `run` function which will return our `Raffle` contract deployment. Great!
 
-If that is false we need to deploy a mock vrfCoordinatorV2 and pass its address inside a `NetworkConfig` that will be used on Anvil.
+Let's work smart, looking again over the plan we see that we'll have to deploy the Raffle contract on at least 3 different chains. Let's stop here with the deployment script and work on the `HelperConfig`.
 
-Please use your Explorer on the left side to access the following path:
+Create a new file called `HelperConfig.s.sol` in the `script` folder.
 
-`foundry-f23/foundry-smart-contract-lottery-f23/lib/chainlink/contracts/src/v0.8/vrf`
-
-Inside you'll find multiple folders, one of which is called `mocks`. Inside that folder, you can find the `VRFCoordinatorV2Mock` mock contract created by Chainlink.
-
-Add the following line in the imports section of `HelperConfig.s.sol`:
+Inside let's create the `HelperConfig` contract:
 
 ```solidity
-import { VRFCoordinatorV2Mock } from "chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import {Script} from "forge-std/Script.sol";
+
+contract HelperConfig is Script {
+
+    struct NetworkConfig {
+        uint256 entranceFee;
+        uint256 interval;
+        address vrfCoordinator;
+        bytes32 gasLane;
+        uint64 subscriptionId;
+        uint32 callbackGasLimit;
+
+    }
 ```
 
-Amazing! Now let's keep on working on the `getOrCreateAnvilEthConfig` function. We need to deploy the `vrfCoordinatorV2Mock`, but if we open it we'll see that its constructor requires some parameters:
+We start with the `SPDX`and `pragma solidity` declarations. Then, we import `Script` from Foundry, name the contract and make it inherit `Script`. Cool! Now what do we need to deploy the `Raffle` contract? That information can be easily found in the `Raffle` contract's constructor:
+
+`constructor(uint256 entranceFee, uint256 interval, address vrfCoordinator, bytes32 gasLane, uint64 subscriptionId, uint32 callbackGasLimit)`
+
+We created a new struct called `NetworkConfig` and we matched its contents with the Raffle's constructor input.
+
+Great! Now let's design a function that returns the proper config for Sepolia:
 
 ```solidity
-constructor(uint96 _baseFee, uint96 _gasPriceLink) ConfirmedOwner(msg.sender) {
-  BASE_FEE = _baseFee;
-  GAS_PRICE_LINK = _gasPriceLink;
-  setConfig();
+function getSepoliaEthConfig() public pure returns (NetworkConfig memory) {
+  return
+    NetworkConfig({
+      entranceFee: 0.01 ether,
+      interval: 30, // 30 seconds
+      vrfCoordinator: 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B,
+      gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
+      subscriptionId: 0, // If left as 0, our scripts will create one!
+      callbackGasLimit: 500000 // 500,000 gas
+    });
 }
 ```
 
-The `_baseFee` is the flat fee that VRF charges for the provided randomness and `_gasPriceLink` which is the gas consumed by the VRF node when calling your function. Given the way it's structured the callback gas is paid initially by the node which needs to be reimbursed. Both these parameters are denominated in LINK tokens.
+The function above returns a `NetworkConfig` struct with data taken from [here](https://docs.chain.link/vrf/v2/subscription/supported-networks#sepolia-testnet). The `interval`, `entranceFee` and `callbackGasLimit` were selected by Patrick.
 
-We add the following lines to the `getOrCreateAnvilEthConfig` function:
-
-```solidity
-        uint96 baseFee = 0.25 ether; // To be understood as 0.25 LINK
-        uint96 gasPriceLink = 1e9; // 1 gwei LINK
-
-        vm.startBroadcast();
-        VRFCoordinatorV2Mock vrfCoordinatorV2Mock = new VRFCoordinatorV2Mock(
-            baseFee,
-            gasPriceLink
-
-        );
-```
-
-Amazing! Now that we have everything we need, let's perform the return, similar to what we did in `getSepoliaEthConfig`.
+Ok, we need a couple more things. We need a constructor that checks what blockchain we are on and attributes a state variable, let's call it `activeNetworkConfig`, the proper config for the chain used.
 
 ```solidity
-        return NetworkConfig({
-            entranceFee: 0.01 ether,
-            interval: 30, // 30 seconds
-            vrfCoordinator: address(vrfCoordinatorV2Mock),
-            gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
-            subscriptionId: 0, // If left as 0, our scripts will create one!
-            callbackGasLimit: 500000 // 500,000 gas
+    NetworkConfig public activeNetworkConfig;
+    constructor() {
+        if (block.chainid == 11155111) {
+            activeNetworkConfig = getSepoliaEthConfig();
+        } else {
+            activeNetworkConfig = getOrCreateAnvilEthConfig();
+        }
 
-        });
+    }
 ```
 
-Great! Now this is fixed let's continue testing and deploying our Raffle contract.
+Good, we only missing the `getOrCreateAnvilEthConfig` function.
+
+For now, let's create only a part of it:
+
+```solidity
+    function getOrCreateAnvilEthConfig()
+        public
+        returns (NetworkConfig memory anvilNetworkConfig)
+    {
+        // Check to see if we set an active network config
+        if (activeNetworkConfig.vrfCoordinator != address(0)) {
+            return activeNetworkConfig;
+        }
+
+```
+
+We check if the `activeNetworkConfig` is populated, and if is we return it. If not we need to deploy some mocks. But more on that in the next lesson.
