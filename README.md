@@ -1,19 +1,82 @@
-# Coverage Report
+# Testing and refactoring the performUpkeep
 
-To better identify which lines of code are covered, we can generate a detailed coverage report.
+Let's give some love to `performUpkeep`, starting with some tests.
 
-The following command will create a file called `coverage.txt`, containing the specific lines of code that have not been covered yet.
+Starting light, open the `RaffleTest.t.sol` and paste the following:
 
-```bash
-forge coverage --report debug > coverage.txt
+```solidity
+function testPerformUpkeepCanOnlyRunIfCheckUpkeepIsTrue() public {
+  // Arrange
+  vm.prank(PLAYER);
+  raffle.enterRaffle{ value: entranceFee }();
+  vm.warp(block.timestamp + interval + 1);
+  vm.roll(block.number + 1);
+
+  // Act / Assert
+  // It doesnt revert
+  raffle.performUpkeep("");
+}
 ```
 
-Looking into this file, we can see all specific areas that require test coverage. For example, at line 65, we need to verify if all parameters in the constructor are set correctly. Similarly, line 73 lacks a check for the entrance fee value. Line 129 indicates that we also need to verify the `upkeepNotNeeded` revert statement.By systematically addressing these uncovered lines, we can significantly enhance our test coverage.
+We prank the `PLAYER` address, then use it to call `enterRaffle` with the correct `entranceFee`. We use the `warp` and `roll` to set `block.timestamp` into the future. Lastly, we call `performUpkeep`.
 
-We should improve our test suite by writing additional tests. Here are some specific tests you might want to write yourself:
+As you've figured out, we are not running any asserts here. But that is ok because if `performUpkeep` had a reason to fail, then it would have reverted and our `forge test` would have caught it.
 
-- [testCheckUpkeepReturnsFalseIfEnoughTimeHasntPassed](https://github.com/Cyfrin/foundry-smart-contract-lottery-cu/blob/083ebe5843573edfaa52fb002613b87d36d0d466/test/unit/RaffleTest.t.sol#L140)
-- [testCheckUpkeepReturnsTrueWhenParametersGood](https://github.com/Cyfrin/foundry-smart-contract-lottery-cu/blob/083ebe5843573edfaa52fb002613b87d36d0d466/test/unit/RaffleTest.t.sol#L153C14-L153C58)
+Run the test using: `forge test --mt testPerformUpkeepCanOnlyRunIfCheckUpkeepIsTrue`
 
-> 🗒️ **NOTE**
-> You don't need to submit a pull request or make any course-related updates. This exercise is for your benefit to increase your testing skills.
+It passes, amazing!
+
+Keep going! Let's test if perform upkeep reverts in case check upkeep is false:
+
+```solidity
+function testPerformUpkeepRevertsIfCheckUpkeepIsFalse() public {
+  // Arrange
+  uint256 currentBalance = 0;
+  uint256 numPlayers = 0;
+  Raffle.RaffleState rState = raffle.getRaffleState();
+  // Act / Assert
+  vm.expectRevert(
+    abi.encodeWithSelector(
+      Raffle.Raffle__UpkeepNotNeeded.selector,
+      currentBalance,
+      numPlayers,
+      rState
+    )
+  );
+  raffle.performUpkeep("");
+}
+```
+
+This can be understood easier if we start from the end. We want to call `performUpkeep` and we expect it to revert. For that, we use the `vm.expectRevert` to indicate that we expect the next call to revert. If we access [this link](https://book.getfoundry.sh/cheatcodes/expect-revert) we can see that in case we use a custom error with parameters we can specify them as follows:
+
+```solidity
+vm.expectRevert(
+    abi.encodeWithSelector(CustomError.selector, 1, 2)
+
+);
+```
+
+In our case the custom error has 3 parameters:
+
+```solidity
+error Raffle__UpkeepNotNeeded(
+  uint256 currentBalance,
+  uint256 numPlayers,
+  uint256 raffleState
+);
+```
+
+First parameter: `Raffle.Raffle__UpkeepNotNeeded.selector`;
+Second parameter: `currentBalance`;
+Third parameter: `numPlayers`;
+Fourth parameter: `raffleState`;
+
+Out of all of them, the only one available is the first. We define a `currentBalance` and `numPlayers` and assign them both 0. To get the `raffleState` we can use the `getRaffleState` view function.
+
+Run the test using: `forge test --mt testPerformUpkeepRevertsIfCheckUpkeepIsFalse`
+
+Everything passes, great!
+
+I know some concepts haven't been explained. I'm referring to `encodeWithSelector` and the general concept of function selectors. These will be introduced in the next sections.
+
+Great work! Now let's further explore events.
