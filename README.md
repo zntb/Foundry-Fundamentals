@@ -1,51 +1,19 @@
-# Even More Tests
+# Coverage Report
 
-## Introduction
+To better identify which lines of code are covered, we can generate a detailed coverage report.
 
-In this lesson we are going to build a couple more tests. If we check our code coverage with `forge coverage`, the terminal will show that we are only at around 53% coverage for the `Raffle.sol` contract. Code coverage refers to the percentage of lines of code that have been tested.
+The following command will create a file called `coverage.txt`, containing the specific lines of code that have not been covered yet.
 
-> 💡 **TIP**
-> Achieving 100% coverage isn't always required, but it is a recommended target.
-
-### `checkUpkeep` tests
-
-To improve our coverage, we need to write additional tests. For example we can address the `checkUpkeep` function, to ensure it really executes as intended under various circumstances.
-
-1. Let’s start by ensuring that `checkUpkeep` returns `false` when there is no balance. We’ll do this by setting up our test environment similarly to previous tests but without entering the raffle. Here’s the code:
-
-```solidity
-function testCheckUpkeepReturnsFalseIfItHasNoBalance() public {
-  // Arrange
-  vm.warp(block.timestamp + automationUpdateInterval + 1);
-  vm.roll(block.number + 1);
-
-  // Act
-  (bool upkeepNeeded, ) = raffle.checkUpkeep("");
-
-  // Assert
-  assert(!upkeepNeeded);
-}
+```bash
+forge coverage --report debug > coverage.txt
 ```
 
-1. Next, we want to assert that `checkUpkeep` returns `false` when the raffle is in a _not open_ state. To do this, we can use a setup similar to our previous test:
+Looking into this file, we can see all specific areas that require test coverage. For example, at line 65, we need to verify if all parameters in the constructor are set correctly. Similarly, line 73 lacks a check for the entrance fee value. Line 129 indicates that we also need to verify the `upkeepNotNeeded` revert statement.By systematically addressing these uncovered lines, we can significantly enhance our test coverage.
 
-```solidity
-function testCheckUpkeepReturnsFalseIfRaffleIsntOpen() public {
-  // Arrange
-  vm.prank(PLAYER);
-  raffle.enterRaffle{ value: raffleEntranceFee }();
-  vm.warp(block.timestamp + automationUpdateInterval + 1);
-  vm.roll(block.number + 1);
-  raffle.performUpkeep("");
-  Raffle.RaffleState raffleState = raffle.getRaffleState();
-  // Act
-  (bool upkeepNeeded, ) = raffle.checkUpkeep("");
-  // Assert
-  assert(raffleState == Raffle.RaffleState.CALCULATING);
-  assert(upkeepNeeded == false);
-}
-```
+We should improve our test suite by writing additional tests. Here are some specific tests you might want to write yourself:
 
-### Conclusion
+- [testCheckUpkeepReturnsFalseIfEnoughTimeHasntPassed](https://github.com/Cyfrin/foundry-smart-contract-lottery-cu/blob/083ebe5843573edfaa52fb002613b87d36d0d466/test/unit/RaffleTest.t.sol#L140)
+- [testCheckUpkeepReturnsTrueWhenParametersGood](https://github.com/Cyfrin/foundry-smart-contract-lottery-cu/blob/083ebe5843573edfaa52fb002613b87d36d0d466/test/unit/RaffleTest.t.sol#L153C14-L153C58)
 
-By writing these additional tests, we enhance our test coverage rate, improve the reliability of our `Raffle.sol` contract, and check that `checkUpkeep` behaves correctly under various conditions.
+> 🗒️ **NOTE**
+> You don't need to submit a pull request or make any course-related updates. This exercise is for your benefit to increase your testing skills.
