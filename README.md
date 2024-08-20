@@ -1,84 +1,73 @@
-# Refactoring events data
+# Intro to fuzz testing
 
-In this lesson, we will learn how to access event data inside our tests.
+## Fuzz testing
 
-Let's create a new event and emit it in `performUpkeep` to test something.
+Generally, fuzz testing, also known as fuzzing, is an automated software testing technique that involves injecting invalid, malformed, or unexpected inputs into a system to identify software defects and vulnerabilities. This method helps in revealing issues that may lead to crashes, security breaches, or performance problems. Fuzz testing operates by feeding a program with large volumes of random data (referred to as "fuzz") to observe how the system handles such inputs. If the system crashes or exhibits abnormal behavior, it indicates a potential vulnerability or defect that needs to be addressed.
 
-Inside `Raffle.sol` in the events section create a new event:
+How can we apply this in Foundry?
 
-`event RequestedRaffleWinner(uint256 indexed requestId);`
+Let's find out by testing the fact that fulfillRandomWords can only be called after the upkeep is performed.
 
-Emit the event at the end of the `performUpkeep` function:
+Open `RaffleTest.t.sol` and add the following:
+
+`import {VRFCoordinatorV2Mock} from "chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";` in the import section.
 
 ```solidity
-function performUpkeep(bytes calldata /* performData */) external override {
-  (bool upkeepNeeded, ) = checkUpkeep("");
-  // require(upkeepNeeded, "Upkeep not needed");
-  if (!upkeepNeeded) {
-    revert Raffle__UpkeepNotNeeded(
-      address(this).balance,
-      s_players.length,
-      uint256(s_raffleState)
-    );
-  }
-  s_raffleState = RaffleState.CALCULATING;
-  uint256 requestId = i_vrfCoordinator.requestRandomWords(
-    i_gasLane,
-    i_subscriptionId,
-    REQUEST_CONFIRMATIONS,
-    i_callbackGasLimit,
-    NUM_WORDS
-  );
-
-  emit RequestedRaffleWinner(requestId);
+function testFulfillRandomWordsCanOnlyBeCalledAfterPerformUpkeep()
+  public
+  raffleEntredAndTimePassed
+{
+  // Arrange
+  // Act / Assert
+  vm.expectRevert("nonexistent request");
+  // vm.mockCall could be used here...
+  VRFCoordinatorV2Mock(vrfCoordinatorV2).fulfillRandomWords(0, address(raffle));
 }
 ```
 
-At this point in the video, Patrick asks the audience if this event is redundant. This is an amazing question to ask yourself every time you do something in Solidity because as you know, everything costs gas. Another absolute truth about this environment is that no one wants to pay gas. So we, as developers, need to write efficient code.
-
-To answer Patrick's question: Yes it's redundant, inside the `VRFCoordinatorV2Mock` you'll find that the `requestRandomWords` emits a giant event called `RandomWordsRequested` that contains the `requestId` we are also emitting in our new event. You'll see this a lot in smart contracts that involve transfers. But more on that in future sections.
-
-We will keep the event for now for testing purposes.
-
-It is important to test events! You might see them as a nice feature to examine what happened more easily using etherscan, but that's not all they are for. For example, the request for randomness is 100% reliant on events, because when `requestRandomWords` emits the `RandomWordsRequested` event, that gets picked up by the Chainlink nodes and the nodes use the information to provide the randomness service to you by calling back your `fulfillRandomWords`. **In the absence of the event, they wouldn't know where and what to send.**
-
-Let's write a test that checks if `performUpkeep` updates the raffle state and emit the event we created:
-
-Add `import {Vm} from "forge-std/Vm.sol";` inside the import sections of `RaffleTest.t.sol`.
-
-We decided to include the `PLAYER` entering the raffle and setting `block.timestamp` into the future inside a modifier. That way we can easily use that everywhere, without typing the same 4 rows of code over and over again.
+So we define the function and use the modifier we created in the previous lesson to make `PLAYER` enter the raffle and set `block.timestamp` into the future. We use the `expectRevert` because we expect the next call to revert with the `"nonexistent request"` message. How do we know that? Simple, inside the `VRFCoordinatorV2Mock` we can see the following code:
 
 ```solidity
-    modifier raffleEntredAndTimePassed() {
-        vm.prank(PLAYER);
-        raffle.enterRaffle{value: entranceFee}();
-        vm.warp(block.timestamp + interval + 1);
-        vm.roll(block.number + 1);
-        _
-    }
+  function fulfillRandomWords(uint256 _requestId, address _consumer) external nonReentrant {
+    fulfillRandomWordsWithOverride(_requestId, _consumer, new uint256[](0));
+  }
 
-
-    function testPerformUpkeepUpdatesRaffleStateAndEmitsRequestId() public raffleEntredAndTimePassed {
-
-        // Act
-        vm.recordLogs();
-        raffle.performUpkeep(""); // emits requestId
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        bytes32 requestId = entries[1].topics[1];
-
-        // Assert
-        Raffle.RaffleState raffleState = raffle.getRaffleState();
-        // requestId = raffle.getLastRequestId();
-        assert(uint256(requestId) > 0);
-        assert(uint(raffleState) == 1); // 0 = open, 1 = calculating
+  /**
+   * @notice fulfillRandomWordsWithOverride allows the user to pass in their own random words.
+   *
+   * @param _requestId the request to fulfill
+   * @param _consumer the VRF randomness consumer to send the result to
+   * @param _words user-provided random words
+   */
+  function fulfillRandomWordsWithOverride(uint256 _requestId, address _consumer, uint256[] memory _words) public {
+    uint256 startGas = gasleft();
+    if (s_requests[_requestId].subId == 0) {
+      revert("nonexistent request");
 
     }
 ```
 
-Let's analyze the test line by line. We start by calling `vm.recordLogs()`. You can read more about this one [here](https://book.getfoundry.sh/cheatcodes/record-logs). This cheatcode starts recording all emitted events inside an array. After that, we call `performUpkeep` which emits both the events we talked earlier about. We can access the array where all the emitted events were stored by using `vm.getRecordedLogs()`. It usually takes some trial and error, or `forge debug` to know where the event that interests us is stored. But we can cheat a little bit. We know that the big event from the vrfCoordinator is emitted first, so our event is second, i.e. entries\[1] (because the index starts from 0). Looking further in the examples provided [here](entries[1]), we see that the first topic, stored at index 0, is the name and output of the event. Given that our event only emits one parameter, the `requestId`, then we are aiming for `entries[1].topics[1]`.
+If the `requestId` is not registered, then the `if (s_requests[_requestId].subId == 0)` check would revert using the desired message.
 
-Moving on, we get the raffle state using the `getRaffleState` view function. We assert the `requestId` is higher than 0, meaning it exists, we also assert that `raffleState` is equal to 1, i.e. CALCULATING.
+Moving on, we called `vm.expectRevert` then we called `fulfillRandomWords` with an invalid `requestId`, i.e. requestId = 0. But why only 0, what if it works with other numbers? How can we test the same thing with 1000 different inputs to make sure that this is more relevant?
 
-Run the test using `forge test --mt testPerformUpkeepUpdatesRaffleStateAndEmitsRequestId`.
+Here comes Foundry fuzzing:
 
-It passes, great job!
+```solidity
+function testFulfillRandomWordsCanOnlyBeCalledAfterPerformUpkeep(
+  uint256 requestId
+) public raffleEntredAndTimePassed {
+  // Arrange
+  // Act / Assert
+  vm.expectRevert("nonexistent request");
+  // vm.mockCall could be used here...
+  VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(
+    requestId,
+    address(raffle)
+  );
+}
+```
+
+If we specify an input parameter in the test function declaration, Foundry will provide random values wherever we use that parameter inside our test function.
+
+This was just a small taste. Foundry fuzzing has an enormous testing capability. We will discuss more about them in the next sections.
