@@ -1,23 +1,46 @@
-# Deploy the lottery on the testnet pt.1
+# Implementing console log in your smart contract
 
-### Deploying on Sepolia using Makefile
+## Debugging using console log
 
-In the previous lesson, we created a Makefile that helped us deploy our contract on Anvil. We also used an if statement to check if our `deploy` target is followed by `Args="--network sepolia"`. We never tested it. Let's do that now!
+Do you remember how inside our `Raffle.t.sol` we did `import {Test, console} from "forge-std/Test.sol";` to import the console? And then again, we did the same thing inside the Script files? This is not limited only to testing and scripting. Let's demonstrate:
 
-Run the following command in your terminal:
+1. Add the following in the import section of your `Raffle.sol` file: `import {console} from "forge-std/Script.sol";`
+2. Change the `enterRaffle` function as follows:
 
-`make deploy ARGS="--network sepolia"`
+```solidity
+function enterRaffle() public payable {
+  if (s_raffleState == RaffleState.CALCULATING) revert Raffle__RaffleNotOpen();
+  if (msg.value < i_entranceFee) revert Raffle__NotEnoughEthSent();
+  console.log("Debugging at its finest");
+  s_players.push(payable(msg.sender));
 
-Everything should go smoothly, and your contract should be verified.
+  emit EnteredRaffle(msg.sender);
+}
+```
 
-Let's interact with it using etherscan. Find your contract by searching your deployment address at <https://sepolia.etherscan.io/>. Click on the `Contract` button, which should have a green tick signifying that it's verified. Click on `Write Contract`. Click on `Connect to Web3`. Accept the warning, select Metamask, and select your testing account. Click on `enterRaffle` and put `0.01` ether there. Wait for your transaction to go through. Then, click on `Read Contract` and then click on `getNumberOfPlayers`. You should see a `1`. Which means we just entered our Raffle contract. GREAT!
+1. Run `forge test --mt testRaffleRecordsPlayerWhenTheyEnter -vv`.
 
-Let's take care of the Automation side now. Go to [automation.chain.link](https://automation.chain.link/), log in with your test account using Metamask, then click on `Register new Upkeep`. Chose `Custom logic` and paste in your Sepolia Raffle contract address. Give it a nice name like `Start Draw`, give it a starting balance of 2 LINK, scroll down and click on `Register Upkeep`, sign the transaction, wait a bit, then sign the message, then wait a bit, then click on `View Upkeep`.
+The result:
 
-**Reminder:** Everyone can call `performUpkeep` and it will work if all the conditions are met. But we don't want that to be the main way that function is called. We want to use the Chainlink Automation service to call it.
+```bash
+Ran 1 test for test/unit/RaffleTest.t.sol:RaffleTest
+[PASS] testRaffleRecordsPlayerWhenTheyEnter() (gas: 71482)
+Logs:
+  Creating subscription on ChainID:  31337
+  Your sub Id is:  1
+  Please update subscriptionId in HelperConfig!
+  Funding subscription:  1
+  Using vrfCoordinator:  0x90193C961A926261B756D1E5bb255e67ff9498A1
+  On ChainID:  31337
+  Adding consumer contract:  0xBb2180ebd78ce97360503434eD37fcf4a1Df61c3
+  Using VRFCoordinator:  0x90193C961A926261B756D1E5bb255e67ff9498A1
+  On chain id:  31337
+  Debugging at its finest
 
-On the `Start Draw` automation page, we will see that Chainlink already ran the `performUpKeep` function. Go to <https://vrf.chain.link/> and click on your subscription to see your `Pending` request. After some time, you will see its status update to `Success`. AMAZING! Let's go back to etherscan to check our raffle contract. Go to `Contract` > `Read Contract` click on `Connect to Web3` then click on `getRecentWinner`. You'll see that we indeed have a recent winner, which means our protocol worked flawlessly.
 
-This time we chose to use Etherscan's interface to interact with our contract, but we could have done all this 100% using Foundry. You can use `cast call` to perform all the operations we did in `Read Contract`. We could have used `cast send` to perform everything we did in `Write contract`.
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 11.59ms (84.60µs CPU time)
+```
 
-This will do for now! See you in the next lesson!
+You can see the `Debugging at its finest` message at the end of the log. Super nice!
+
+**Note:** Make sure to delete those before deploying to mainnet, because this will cost gas, and you do not want to spend that!
