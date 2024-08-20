@@ -1,22 +1,23 @@
-# Creating integration tests
+# Deploy the lottery on the testnet pt.1
 
-### Integration testing
+### Deploying on Sepolia using Makefile
 
-We have finished the unit tests. Amazing!
+In the previous lesson, we created a Makefile that helped us deploy our contract on Anvil. We also used an if statement to check if our `deploy` target is followed by `Args="--network sepolia"`. We never tested it. Let's do that now!
 
-But that doesn't mean we are finished with testing. Unit tests are just the first step. If you remember what we learned some lessons ago there are 4 types of tests:
+Run the following command in your terminal:
 
-1. Unit tests - Basic tests that check the functionality;
-2. Integration tests - We test our deployment scripts and other components of our contracts;
-3. Forked tests - Pseudo staging;
-4. Staging tests - We run tests on a mainnet/testnet;
+`make deploy ARGS="--network sepolia"`
 
-We won't cover staging tests for now, but these are very important. People often deploy their entire protocols on testnets or cheap mainnets like Polygon to properly check how their protocols behave in production environments.
+Everything should go smoothly, and your contract should be verified.
 
-Testnets are not always fun to interact with (just remember the gigantic refactoring we had to do in the previous lesson), but they are the closest thing to the mainnet we have. To check the recommended testnet please access the [Foundry Full Course F23 repo](https://github.com/Cyfrin/foundry-full-course-f23).
+Let's interact with it using etherscan. Find your contract by searching your deployment address at <https://sepolia.etherscan.io/>. Click on the `Contract` button, which should have a green tick signifying that it's verified. Click on `Write Contract`. Click on `Connect to Web3`. Accept the warning, select Metamask, and select your testing account. Click on `enterRaffle` and put `0.01` ether there. Wait for your transaction to go through. Then, click on `Read Contract` and then click on `getNumberOfPlayers`. You should see a `1`. Which means we just entered our Raffle contract. GREAT!
 
-Back to integration testing, we already started testing the deployment script given that in the `RaffleTest.t.sol::setUp` function we used the script to deploy our Raffle contract. A better approach would have been to create an `InteractionsTest.t.sol` and test the deploy scripts first, then use them in the `RaffleTest.t.sol`.
+Let's take care of the Automation side now. Go to [automation.chain.link](https://automation.chain.link/), log in with your test account using Metamask, then click on `Register new Upkeep`. Chose `Custom logic` and paste in your Sepolia Raffle contract address. Give it a nice name like `Start Draw`, give it a starting balance of 2 LINK, scroll down and click on `Register Upkeep`, sign the transaction, wait a bit, then sign the message, then wait a bit, then click on `View Upkeep`.
 
-We will not do staging tests because writing scripts that do a lot of waiting is a bit tricky. Foundry is phenomenal in testing things that are 100% on chain, but given that we are using Chainlink VRF and some things that happen off-chain, we will struggle to do these staging tests.
+**Reminder:** Everyone can call `performUpkeep` and it will work if all the conditions are met. But we don't want that to be the main way that function is called. We want to use the Chainlink Automation service to call it.
 
-If you want to try your hand in writing some tests go ahead and write the `InteractionsTest.t.sol` tests. These should cover at least the `DeployRaffle.s.sol`. If you want to score extra points and be a true champion, then cover all the scripts.
+On the `Start Draw` automation page, we will see that Chainlink already ran the `performUpKeep` function. Go to <https://vrf.chain.link/> and click on your subscription to see your `Pending` request. After some time, you will see its status update to `Success`. AMAZING! Let's go back to etherscan to check our raffle contract. Go to `Contract` > `Read Contract` click on `Connect to Web3` then click on `getRecentWinner`. You'll see that we indeed have a recent winner, which means our protocol worked flawlessly.
+
+This time we chose to use Etherscan's interface to interact with our contract, but we could have done all this 100% using Foundry. You can use `cast call` to perform all the operations we did in `Read Contract`. We could have used `cast send` to perform everything we did in `Write contract`.
+
+This will do for now! See you in the next lesson!
